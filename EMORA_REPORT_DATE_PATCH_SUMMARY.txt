@@ -1,0 +1,15 @@
+SELIN report date default patch
+Project: C:\Users\LD\Downloads\selin-hr-direct-deploy\selin-hr
+Backup: C:\Users\LD\Downloads\selin-hr-direct-deploy\selin-hr\.selin-backups\report-date-defaults-2026-09-04T13-50-15-808Z
+
+CHANGED (2):
+  - app\dashboard\penalties\page.tsx
+  - app\dashboard\reports\page.tsx
+
+DATE-RANGE CANDIDATES NOT AUTO-PATCHED (1):
+  - app\dashboard\attendance\page.tsx
+
+SKIPPED (0):
+
+Rule applied: date-from = Cairo today, date-to = Cairo today.
+No SQL/backend/data changes were made.

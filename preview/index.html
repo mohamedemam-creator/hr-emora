@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Selin — Preview</title>
+<style>
+:root{--p:#6d28d9;--p2:#9333ea;--pink:#ec4899;--navy:#20104f;--muted:#706982;--line:#ebe6f4;--bg:#f7f5fb}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Segoe UI,Tahoma,Arial,sans-serif;color:#282335}.app{min-height:100vh;display:grid;grid-template-columns:245px 1fr}.side{background:linear-gradient(180deg,#250d5c,#16072f);color:white;padding:25px 17px;position:sticky;top:0;height:100vh}.logo{display:flex;align-items:center;gap:10px;direction:ltr;margin:0 8px 30px}.mark{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--pink),var(--p));font-size:25px;font-weight:900;box-shadow:inset 0 0 0 6px rgba(255,255,255,.13)}.logo strong{font-size:28px}.logo small{display:block;font-size:8px;letter-spacing:2px;color:#d8caff}.side button{width:100%;border:0;background:transparent;color:#d9d0ed;padding:12px 13px;border-radius:11px;text-align:right;margin:3px 0;cursor:pointer;font-weight:600}.side button.active,.side button:hover{background:linear-gradient(90deg,var(--p),var(--p2));color:white}.main{min-width:0}.top{height:75px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}.search{width:360px;background:#f7f4fb;border:1px solid var(--line);padding:11px 15px;border-radius:12px;color:#9289a3}.user{display:flex;align-items:center;gap:10px}.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--pink),var(--p));display:grid;place-items:center;color:white;font-weight:800}.content{padding:30px}.view{display:none}.view.active{display:block}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}.heading h1{margin:4px 0;color:var(--navy)}.heading p{margin:0;color:var(--muted)}.eyebrow{color:var(--p);font-size:13px;font-weight:800}.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer}.primary{background:linear-gradient(135deg,var(--p),var(--p2));color:white;box-shadow:0 10px 25px #6d28d933}.secondary{background:#f0e9ff;color:var(--p)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card,.panel{background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 25px #2c145b0c}.card{padding:20px}.card span{color:var(--muted);font-size:13px}.card strong{display:block;font-size:30px;color:var(--navy);margin:8px 0}.card small{color:#059669}.grid{display:grid;grid-template-columns:1.5fr .8fr;gap:17px;margin-top:17px}.panel{padding:22px}.panel h2{margin:0;color:var(--navy)}.chart{height:250px;margin-top:25px;border-bottom:2px solid #e9e2f5;background:repeating-linear-gradient(to bottom,transparent 0,transparent 48px,#eeeaf4 49px);position:relative}.chart:after{content:"";position:absolute;left:4%;right:4%;top:48%;height:5px;background:linear-gradient(90deg,var(--p),var(--pink));border-radius:99px;transform:rotate(-4deg);box-shadow:0 22px 40px #9333ea44}.action{display:flex;align-items:center;gap:12px;padding:17px 0;border-bottom:1px solid var(--line)}.action i{width:42px;height:42px;border-radius:12px;background:#f1e9ff;display:grid;place-items:center;color:var(--p);font-style:normal}.action div{display:grid;gap:4px}.action small{color:var(--muted)}.form-layout{display:grid;grid-template-columns:1.25fr .75fr;gap:18px}.form{display:grid;gap:18px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:15px}.label{display:grid;gap:7px;font-size:13px;font-weight:700}.label input,.label select{height:47px;border:1px solid var(--line);border-radius:12px;padding:0 13px;outline:0}.wide{grid-column:1/-1}.location{padding:17px;border:1px dashed #bba4e7;background:#faf8ff;border-radius:15px;display:flex;align-items:center;justify-content:space-between;gap:15px}.location strong{display:block;color:var(--navy)}.location p{margin:4px 0;color:var(--muted);font-size:12px}.success{display:none;padding:13px;border-radius:12px;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}.map{padding:0;overflow:hidden}.mapbox{height:360px;background-color:#eee9f8;background-image:linear-gradient(#d8cde8 1px,transparent 1px),linear-gradient(90deg,#d8cde8 1px,transparent 1px);background-size:30px 30px;display:grid;place-items:center}.radius{width:210px;height:210px;border-radius:50%;border:2px dashed var(--p2);background:#9333ea20;display:grid;place-items:center}.pin{width:55px;height:55px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,var(--pink),var(--p));display:grid;place-items:center;color:white;font-size:25px}.pin span{transform:rotate(45deg)}.mapinfo{padding:20px}.setup{max-width:820px;margin:auto}.setup .panel{padding:35px}.setup h1{text-align:center;color:var(--navy)}.setup>p{text-align:center;color:var(--muted);margin-bottom:30px}.steps{display:flex;justify-content:center;gap:8px;margin:20px}.dot{width:11px;height:11px;border-radius:50%;background:#ddd4eb}.dot.on{background:var(--p)}@media(max-width:950px){.app{grid-template-columns:82px 1fr}.logo div,.side button span{display:none}.side button{text-align:center}.stats{grid-template-columns:1fr 1fr}.grid,.form-layout{grid-template-columns:1fr}}@media(max-width:620px){.app{display:block}.side{display:none}.search{display:none}.content{padding:18px}.stats{grid-template-columns:1fr 1fr;gap:9px}.heading{align-items:flex-start}.fields{grid-template-columns:1fr}.wide{grid-column:auto}.location{display:grid}.top{padding:0 15px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="logo"><div class="mark">✓</div><div><strong>Selin</strong><small>TIME & ATTENDANCE</small>
+  </div>
+</div>
+  <button class="active" data-view="dashboard"><span>⌂ الرئيسية</span></button>
+  <button data-view="setup"><span>⚙ إعداد الشركة</span></button>
+  <button data-view="branch"><span>⌖ المناطق والفروع</span></button>
+  <button><span>👥 الموظفون</span></button>
+  <button><span>◷ الحضور والانصراف</span></button>
+  <button><span>▣ الشيفتات</span></button>
+  <button><span>◫ الإجازات</span></button>
+  <button><span>◉ الرواتب</span></button>
+</aside>
+<section class="main">
+<header class="top">
+  <div class="search">ابحث في النظام...</div>
+  <div class="user">
+    <div>
+       <b>مدير النظام</b>
+    <small style="display:block;color:#777">Super Admin</small>
+  </div><div class="avatar">م</div></div>
+</header>
+<div class="content">
+<section id="dashboard" class="view active">
+  <div class="heading"><div>
+    <span class="eyebrow">الأربعاء، 5 أغسطس 2026</span>
+    <h1>صباح الخير 👋</h1>
+    <p>إليك ملخص حالة فريق العمل اليوم.</p>
+  </div>
+  <button class="btn primary" onclick="showView('branch')">+ إضافة فرع</button>
+</div>
+  <div class="stats">
+    <div class="card">
+      <span>إجمالي الموظفين</span>
+      <strong>128</strong>
+      <small>+8 هذا الشهر</small>
+    </div><div class="card">
+      <span>الحاضرون اليوم</span>
+      <strong>110</strong>
+      <small>86% من الفريق</small>
+    </div><div class="card">
+      <span>المتأخرون</span>
+      <strong>8</strong>
+      <small>أقل 3 عن أمس</small>
+    </div>
+    <div class="card">
+      <span>الفروع النشطة</span>
+      <strong>5</strong>
+      <small>منطقتان</small>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>الحضور الأسبوعي</h2>
+      <p style="color:#777">نسبة الالتزام خلال آخر 7 أيام</p>
+      <div class="chart"></div></div>
+      <div class="panel">
+        <h2>إجراءات سريعة</h2>
+        <div class="action">
+          <i>⌖</i>
+          <div><b>تفعيل فرع جديد</b>
+            <small>حدد الموقع ونطاق الحضور</small>
+          </div>
+        </div>
+        <div class="action">
+          <i>▣</i>
+          <div>
+            <b>إنشاء جدول أسبوعي</b>
+            <small>وزع الشيفتات على الموظفين</small>
+          </div></div>
+          <div class="action">
+            <i>+</i>
+            <div><b>إضافة موظف</b><small>أنشئ الحساب وحدد الصلاحيات</small>
+            </div>
+          </div>
+        </div>
+      </div>
+</section>
+<section id="setup" class="view setup">
+  <div class="steps">
+    <span class="dot on">
+
+    </span><span class="dot">
+
+    </span>
+  </div>
+  <div class="panel">
+    <span class="eyebrow">ابدأ مع Emora</span>
+    <h1>أنشئ مساحة شركتك</h1>
+    <p>سيصبح هذا الحساب مدير النظام الرئيسي، وبعدها ستضيف مديري المناطق والفروع من داخل البرنامج.</p><div class="fields"><label class="label">اسم الشركة<input placeholder="label">مثال:شركه ايمورا"</label><label class="label">كود الشركة<input placeholder="emora01"></label><label class="label">اسم مدير النظام<input placeholder="الاسم الكامل"></label><label class="label">كود الموظف<input placeholder="EMP001"></label><label class="label">البريد الإلكتروني<input placeholder="admin@company.com"></label><label class="label">كلمة المرور<input type="password" placeholder="••••••••"></label></div><button class="btn primary" style="width:100%;margin-top:22px" onclick="showView('dashboard')">إنشاء الشركة والدخول</button></div>
+</section>
+<section id="branch" class="view">
+  <div class="heading">
+    <div><span class="eyebrow">المناطق والفروع</span>
+      <h1>تفعيل فرع جديد</h1>
+      <p>نفّذ هذه الخطوة أثناء وجودك داخل الفرع لضبط الموقع بدقة.</p>
+    </div>
+  </div>
+  <div class="form-layout">
+    <div class="panel form">
+      <h2>بيانات الفرع</h2>
+      <div class="fields">
+          <label class="label">اسم المنطقة<input placeholder="القاهرة">
+        </label>
+        <label class="label">كود المنطقة<input placeholder="CAI">
+          </label>
+        <label class="label">اسم الفرع<input placeholder="فرع المعادي">  
+          </label>
+        <label class="label">كود الفرع<input placeholder="MAA01">
+        </label>
+        <label class="label wide">العنوان<input placeholder="العنوان التفصيلي">
+          </label>
+        <label class="label">نطاق الحضور<select> 
+          <option>150 متر</option>
+          <option>100 متر</option>
+          <option>200 متر</option>
+        </select></label>
+      </div>
+        <div class="location">
+          <div>
+            <strong>📍 موقع الفرع</strong>
+            <p id="coords">شغّل GPS واضغط أثناء وجودك داخل الفرع.</p>
+          </div>
+            <button class="btn secondary" onclick="locate()">استخدام موقعي الحالي</button>
+          </div>
+          <div class="success" id="success">✓ تم التقاط الموقع وتفعيل الفرع بنجاح.</div>
+          <button class="btn primary" onclick="saveBranch()">حفظ وتفعيل الفرع</button>
+        </div>
+        <div class="panel map">
+          <div class="mapbox">
+          <div class="radius">
+          <div class="pin"><span>⌖</span>
+          </div>
+        </div>
+        
+      </div>
+          <div class="mapinfo">
+            <h3>معاينة نطاق الحضور</h3>
+            <p style="color:#777">سيظهر نطاق الفرع حول نقطة الموقع المحددة.</p>
+          </div>
+        </div>
+      </div>
+</section>
+</div>
+</section>
+</div>
+<script>
+function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.side button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id))}
+document.querySelectorAll('.side button[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+function locate(){const el=document.getElementById('coords');el.textContent='Lat: 30.044420 • Lng: 31.235712 • دقة GPS: 8 متر';document.getElementById('success').style.display='block'}
+function saveBranch(){document.getElementById('success').style.display='block'}
+</script>
+</body>
+</html>
