@@ -1,12 +1,10 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
-export const dynamic = 'force-dynamic'
-
 
 type SetupPayload = {
   companyName: string
@@ -17,7 +15,7 @@ type SetupPayload = {
   email: string
 }
 
-export default function SetupPage() {
+function SetupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -165,7 +163,7 @@ export default function SetupPage() {
             <div className="section-fields">
               <h2>بيانات الشركة</h2>
               <div className="two-columns">
-                <label>اسم الشركة<input required name="companyName" placeholder="مثال: شركة سيلين للتجارة" /></label>
+                <label>اسم الشركة<input required name="companyName" placeholder="مثال: شركة ايمورا للتجارة" /></label>
                 <label>كود الشركة<input required name="companyCode" minLength={2} maxLength={20} pattern="[A-Za-z0-9_-]+" placeholder="Emora01" /></label>
               </div>
             </div>
@@ -191,5 +189,13 @@ export default function SetupPage() {
         </form>
       </section>
     </main>
+  )
+}
+
+export default function SetupPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center p-4">جارٍ التحميل...</div>}>
+      <SetupForm />
+    </Suspense>
   )
 }
