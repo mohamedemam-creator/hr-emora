@@ -164,7 +164,7 @@ function SetupForm() {
               <h2>بيانات الشركة</h2>
               <div className="two-columns">
                 <label>اسم الشركة<input required name="companyName" placeholder="مثال: شركة ايمورا للتجارة" /></label>
-                <label>كود الشركة<input required name="companyCode" minLength={2} maxLength={20} pattern="[A-Za-z0-9_-]+" placeholder="Emora01" /></label>
+                <label>كود الشركة<input required name="companyCode" minLength={2} maxLength={20} pattern="[A-Za-z0-9_\-]+" placeholder="Emora01" /></label>
               </div>
             </div>
           </div>
