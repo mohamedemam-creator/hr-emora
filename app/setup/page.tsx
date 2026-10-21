@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
+export const dynamic = 'force-dynamic'
+
 
 type SetupPayload = {
   companyName: string
