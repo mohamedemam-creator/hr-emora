@@ -22,27 +22,30 @@ function SetupForm() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  // 1. Check if returning from Email Confirmation Link
+  // Complete company bootstrap after email confirmation (session is set by /auth/callback)
   useEffect(() => {
     async function handleEmailCallback() {
-      const code = searchParams.get('code')
+      if (searchParams.get('error') === 'auth') {
+        setError('تعذر تأكيد البريد الإلكتروني. حاول إنشاء الشركة مرة أخرى.')
+        return
+      }
+
       const pendingData = window.localStorage.getItem('emora_pending_setup')
+      if (!pendingData) return
 
-      if (code && pendingData) {
-        try {
-          setLoading(true)
-          const payload: SetupPayload = JSON.parse(pendingData)
-          const supabase = createClient()
-          const { data: sessionData } = await supabase.auth.getSession()
+      try {
+        setLoading(true)
+        const payload: SetupPayload = JSON.parse(pendingData)
+        const supabase = createClient()
+        const { data: sessionData } = await supabase.auth.getSession()
 
-          if (sessionData.session?.user) {
-            await bootstrapCompanyDirect(payload, sessionData.session.user.id)
-          }
-        } catch (err: any) {
-          setError(err.message || 'تعذر إكمال إعداد الشركة تلقائياً')
-        } finally {
-          setLoading(false)
+        if (sessionData.session?.user) {
+          await bootstrapCompanyDirect(payload, sessionData.session.user.id)
         }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'تعذر إكمال إعداد الشركة تلقائياً')
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -120,7 +123,7 @@ function SetupForm() {
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/setup`,
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=/setup`,
             },
           })
 
