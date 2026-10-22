@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 type Access = { permissions?: string[]; role?: string }
 
 export default function LoginPage() {
-  const router = Router()
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
