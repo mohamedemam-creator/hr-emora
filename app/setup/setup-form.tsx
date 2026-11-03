@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { Logo } from '@/components/logo'
+import { buildEmailConfirmationRedirect, waitForAuthSession } from '@/lib/auth-confirmation'
 import { formatAppError, hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,36 +22,74 @@ export function SetupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
+  const [authPending, setAuthPending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const hasAuthCallbackError = searchParams.get('error') === 'auth'
 
   useEffect(() => {
+    let active = true
+    const pendingData = window.localStorage.getItem('emora_pending_setup')
+
+    if (!hasAuthCallbackError && !pendingData) return
+
     async function handleEmailCallback() {
-      if (searchParams.get('error') === 'auth') {
-        setError('تعذر تأكيد البريد الإلكتروني. حاول إنشاء الشركة مرة أخرى.')
-        return
-      }
-
-      const pendingData = window.localStorage.getItem('emora_pending_setup')
-      if (!pendingData) return
-
       try {
-        setLoading(true)
-        const payload: SetupPayload = JSON.parse(pendingData)
+        setAuthPending(true)
         const supabase = createClient()
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData.session?.user) {
-          await bootstrapCompany(payload)
+        const session = await waitForAuthSession(async () => {
+          const { data, error: sessionError } = await supabase.auth.getSession()
+          if (sessionError) throw sessionError
+          return data.session
+        })
+
+        if (!active) return
+
+        if (!session) {
+          if (hasAuthCallbackError) {
+            setError('تعذر تأكيد البريد الإلكتروني. أعد فتح أحدث رابط وصل إلى بريدك، أو اطلب رابطاً جديداً.')
+          } else if (pendingData) {
+            setMessage('تم إرسال رابط التأكيد إلى بريدك. افتح الرابط في هذا المتصفح لإكمال إعداد الشركة.')
+          }
+          return
         }
+
+        if (hasAuthCallbackError) {
+          setError('')
+          if (!pendingData) {
+            setAuthPending(false)
+            router.replace('/setup')
+            return
+          }
+        }
+
+        if (!pendingData) return
+
+        const payload: SetupPayload = JSON.parse(pendingData)
+        const sessionEmail = session.user.email?.trim().toLowerCase()
+        if (!sessionEmail || sessionEmail !== payload.email.trim().toLowerCase()) {
+          setError('تم تأكيد حساب مختلف عن البريد المستخدم لإعداد الشركة. سجّل الدخول بالبريد نفسه لإكمال الإعداد.')
+          return
+        }
+
+        setMessage('')
+        setLoading(true)
+        await bootstrapCompany(payload)
       } catch (err: unknown) {
-        setError(formatAppError(err, 'تعذر إكمال إعداد الشركة تلقائياً'))
+        if (active) setError(formatAppError(err, 'تعذر إكمال إعداد الشركة تلقائياً'))
       } finally {
-        setLoading(false)
+        if (active) {
+          setAuthPending(false)
+          setLoading(false)
+        }
       }
     }
 
-    handleEmailCallback()
-  }, [searchParams])
+    void handleEmailCallback()
+    return () => {
+      active = false
+    }
+  }, [hasAuthCallbackError, router])
 
   async function bootstrapCompany(payload: SetupPayload) {
     const supabase = createClient()
@@ -146,7 +185,10 @@ export function SetupForm() {
             email,
             password,
             options: {
-              emailRedirectTo: `${(process.env.NEXT_PUBLIC_APP_URL || 'https://hr-emora.vercel.app').replace(/\/$/, '')}/auth/callback`,
+              emailRedirectTo: buildEmailConfirmationRedirect(
+                process.env.NEXT_PUBLIC_APP_URL,
+                window.location.origin,
+              ),
               data: { full_name: payload.adminName },
             },
           })
@@ -203,10 +245,11 @@ export function SetupForm() {
               </div>
             </div>
           </div>
-          {error ? <div className="form-error">{error}</div> : null}
+          {authPending ? <div className="form-success" role="status" aria-live="polite">جارٍ تأكيد البريد الإلكتروني واستعادة جلسة الدخول...</div> : null}
+          {error ? <div className="form-error" role="alert">{error}</div> : null}
           {message ? <div className="form-success"><CheckCircle2 size={18}/>{message}</div> : null}
-          <button className="button button-primary button-full" disabled={loading}>
-            {loading ? 'جارٍ إنشاء الشركة...' : 'إنشاء الشركة والدخول'}
+          <button className="button button-primary button-full" disabled={loading || authPending}>
+            {authPending ? 'جارٍ تأكيد البريد الإلكتروني...' : loading ? 'جارٍ إنشاء الشركة...' : 'إنشاء الشركة والدخول'}
           </button>
         </form>
       </section>
