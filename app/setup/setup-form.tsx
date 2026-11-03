@@ -70,7 +70,7 @@ export function SetupForm() {
             const payload: SetupPayload = JSON.parse(pendingData)
             setVerificationEmail(payload.email)
             setVerificationPending(true)
-            setMessage('أدخل رمز التحقق المكوّن من 6 أرقام المرسل إلى بريدك لإكمال إعداد الشركة.')
+            setMessage('أدخل رمز التحقق المكوّن من 8 أرقام المرسل إلى بريدك لإكمال إعداد الشركة.')
           }
           return
         }
@@ -218,7 +218,7 @@ export function SetupForm() {
           if (!hasSession) {
             setVerificationEmail(email)
             setVerificationPending(true)
-            setMessage('تم إرسال رمز تحقق مكوّن من 6 أرقام إلى بريدك. أدخله هنا لإكمال إعداد الشركة.')
+            setMessage('تم إرسال رمز تحقق مكوّن من 8 أرقام إلى بريدك. أدخله هنا لإكمال إعداد الشركة.')
             return
           }
         }
@@ -235,7 +235,7 @@ export function SetupForm() {
   async function verifySignupOtp() {
     const code = normalizeSignupOtp(otpCode)
     if (!verificationEmail || !isSignupOtpValid(code)) {
-      setError('أدخل رمز التحقق المكوّن من 6 أرقام.')
+      setError('أدخل رمز التحقق المكوّن من 8 أرقام.')
       return
     }
 
@@ -336,7 +336,7 @@ export function SetupForm() {
               <div className="section-icon"><Mail size={22}/></div>
               <div className="section-fields">
                 <h2>تأكيد البريد الإلكتروني</h2>
-                <p>أدخل رمز التحقق المكوّن من 6 أرقام المرسل إلى {verificationEmail}.</p>
+                <p>أدخل رمز التحقق المكوّن من 8 أرقام المرسل إلى {verificationEmail}.</p>
                 <label className="full-column">رمز التحقق
                   <input
                     name="signupOtp"
@@ -344,11 +344,11 @@ export function SetupForm() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     dir="ltr"
-                    maxLength={6}
+                    maxLength={8}
                     value={otpCode}
                     onChange={event => setOtpCode(normalizeSignupOtp(event.target.value))}
-                    placeholder="123456"
-                    aria-label="رمز التحقق المكوّن من 6 أرقام"
+                    placeholder="12345678"
+                    aria-label="رمز التحقق المكوّن من 8 أرقام"
                   />
                 </label>
                 <button className="button" type="button" onClick={resendSignupOtp} disabled={resendingCode || loading}>
