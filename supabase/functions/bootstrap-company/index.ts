@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getBootstrapPhone } from './phone.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,12 +78,12 @@ Deno.serve(async (req) => {
     actorUserId = userData.user.id
 
     phase = 'validate_input'
-    const body = await req.json()
+    const body = await req.json() as Record<string, unknown>
     const companyName = String(body.companyName ?? '').trim()
     const companyCode = String(body.companyCode ?? '').trim().toUpperCase()
     const ownerName = String(body.adminName ?? '').trim()
     const employeeCode = String(body.employeeCode ?? '').trim().toUpperCase()
-    const phone = String(body.phone ?? '').trim()
+    const phone = getBootstrapPhone(body)
     if (
       !companyName || companyName.length > 160 ||
       !/^[A-Z0-9_-]{2,20}$/.test(companyCode) ||
@@ -97,7 +98,7 @@ Deno.serve(async (req) => {
       p_company_code: companyCode,
       p_owner_name: ownerName,
       p_employee_code: employeeCode,
-      p_phone: phone || null,
+      p_phone: phone,
     })
     if (error) {
       console.error('[bootstrap-company] database transaction failed', {

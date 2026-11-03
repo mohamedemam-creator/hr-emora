@@ -156,7 +156,7 @@ export function SetupForm() {
       companyCode: String(form.get('companyCode')).trim().toUpperCase(),
       adminName: String(form.get('adminName')).trim(),
       employeeCode: String(form.get('employeeCode')).trim().toUpperCase(),
-      phone: String(form.get('phone')).trim(),
+      phone: String(form.get('phone') ?? '').trim(),
       email,
     }
 
@@ -239,7 +239,7 @@ export function SetupForm() {
               <div className="two-columns">
                 <label>الاسم الكامل<input required name="adminName" placeholder="الاسم بالكامل" /></label>
                 <label>كود الموظف<input required name="employeeCode" placeholder="EMP001" /></label>
-                <label>رقم الهاتف<div className="input-wrap"><Phone size={18}/><input name="phone" placeholder="01xxxxxxxxx" /></div></label>
+                <label>رقم الهاتف<div className="input-wrap"><Phone size={18}/><input name="phone" type="tel" autoComplete="tel" placeholder="01xxxxxxxxx" /></div></label>
                 <label>البريد الإلكتروني<div className="input-wrap"><Mail size={18}/><input required type="email" name="email" placeholder="admin@company.com" /></div></label>
                 <label className="full-column">كلمة المرور<div className="input-wrap"><KeyRound size={18}/><input required minLength={8} type="password" name="password" placeholder="8 أحرف على الأقل" /></div></label>
               </div>
