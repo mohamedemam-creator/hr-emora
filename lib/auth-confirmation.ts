@@ -1,12 +1,3 @@
-export function buildEmailConfirmationRedirect(
-  appUrl: string | undefined,
-  currentOrigin: string,
-): string {
-  const redirectUrl = new URL('/auth/callback', appUrl || currentOrigin)
-  redirectUrl.searchParams.set('next', '/setup')
-  return redirectUrl.toString()
-}
-
 export async function waitForAuthSession<TSession>(
   readSession: () => Promise<TSession | null>,
   options: { attempts?: number; intervalMs?: number } = {},

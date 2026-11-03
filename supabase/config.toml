@@ -33,5 +33,5 @@ double_confirm_changes = true
 enable_confirmations = true
 
 [auth.email.template.confirmation]
-subject = "Confirm your Emora HR account"
+subject = "Your Emora HR verification code"
 content_path = "./supabase/templates/confirmation.html"

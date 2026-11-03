@@ -1,16 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  buildEmailConfirmationRedirect,
-  waitForAuthSession,
-} from '../lib/auth-confirmation.ts'
-
-test('builds a confirmation callback for the current origin and setup destination', () => {
-  assert.equal(
-    buildEmailConfirmationRedirect(undefined, 'http://localhost:3000'),
-    'http://localhost:3000/auth/callback?next=%2Fsetup',
-  )
-})
+import { waitForAuthSession } from '../lib/auth-confirmation.ts'
 
 test('waits for a session that becomes available shortly after callback navigation', async () => {
   let calls = 0

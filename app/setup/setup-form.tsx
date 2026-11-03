@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { Logo } from '@/components/logo'
-import { buildEmailConfirmationRedirect, waitForAuthSession } from '@/lib/auth-confirmation'
+import { waitForAuthSession } from '@/lib/auth-confirmation'
+import { isSignupOtpValid, normalizeSignupOtp } from '@/lib/signup-otp'
 import { formatAppError, hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
@@ -25,11 +26,21 @@ export function SetupForm() {
   const [authPending, setAuthPending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [verificationEmail, setVerificationEmail] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [verificationPending, setVerificationPending] = useState(false)
+  const [resendingCode, setResendingCode] = useState(false)
   const hasAuthCallbackError = searchParams.get('error') === 'auth'
 
   useEffect(() => {
     let active = true
     const pendingData = window.localStorage.getItem('emora_pending_setup')
+    const pendingEmail = window.localStorage.getItem('emora_pending_verification_email')
+
+    if (pendingEmail) {
+      setVerificationEmail(pendingEmail)
+      setVerificationPending(true)
+    }
 
     if (!hasAuthCallbackError && !pendingData) return
 
@@ -47,9 +58,19 @@ export function SetupForm() {
 
         if (!session) {
           if (hasAuthCallbackError) {
-            setError('تعذر تأكيد البريد الإلكتروني. أعد فتح أحدث رابط وصل إلى بريدك، أو اطلب رابطاً جديداً.')
+            if (pendingData) {
+              const payload: SetupPayload = JSON.parse(pendingData)
+              setVerificationEmail(payload.email)
+              setVerificationPending(true)
+              setError('تعذر استخدام رابط التأكيد. أدخل رمز التحقق المرسل إلى بريدك أو أعد إرسال الرمز.')
+            } else {
+              setError('تعذر تأكيد البريد الإلكتروني. سجّل الدخول أو اطلب رمز تحقق جديداً من صفحة الإعداد.')
+            }
           } else if (pendingData) {
-            setMessage('تم إرسال رابط التأكيد إلى بريدك. افتح الرابط في هذا المتصفح لإكمال إعداد الشركة.')
+            const payload: SetupPayload = JSON.parse(pendingData)
+            setVerificationEmail(payload.email)
+            setVerificationPending(true)
+            setMessage('أدخل رمز التحقق المكوّن من 6 أرقام المرسل إلى بريدك لإكمال إعداد الشركة.')
           }
           return
         }
@@ -124,6 +145,7 @@ export function SetupForm() {
     }
 
     window.localStorage.removeItem('emora_pending_setup')
+    window.localStorage.removeItem('emora_pending_verification_email')
     if (data?.auditLogged === false) {
       throw new Error('تم إنشاء الشركة بنجاح، لكن تعذر حفظ سجل التدقيق. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع مسؤول النظام.')
     }
@@ -144,6 +166,10 @@ export function SetupForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (verificationPending) {
+      await verifySignupOtp()
+      return
+    }
     setLoading(true)
     setError('')
     setMessage('')
@@ -181,21 +207,18 @@ export function SetupForm() {
           hasSession = true
         } else {
           window.localStorage.setItem('emora_pending_setup', JSON.stringify(payload))
+          window.localStorage.setItem('emora_pending_verification_email', email)
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
-            options: {
-              emailRedirectTo: buildEmailConfirmationRedirect(
-                process.env.NEXT_PUBLIC_APP_URL,
-                window.location.origin,
-              ),
-              data: { full_name: payload.adminName },
-            },
+            options: { data: { full_name: payload.adminName } },
           })
           if (signUpError) throw signUpError
           hasSession = Boolean(signUpData.session)
           if (!hasSession) {
-            setMessage('تم إرسال رابط التأكيد إلى بريدك. بعد تأكيد الإيميل سيتم إنشاء الشركة تلقائياً.')
+            setVerificationEmail(email)
+            setVerificationPending(true)
+            setMessage('تم إرسال رمز تحقق مكوّن من 6 أرقام إلى بريدك. أدخله هنا لإكمال إعداد الشركة.')
             return
           }
         }
@@ -206,6 +229,69 @@ export function SetupForm() {
       setError(formatAppError(caught, 'تعذر إكمال إعداد الشركة'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function verifySignupOtp() {
+    const code = normalizeSignupOtp(otpCode)
+    if (!verificationEmail || !isSignupOtpValid(code)) {
+      setError('أدخل رمز التحقق المكوّن من 6 أرقام.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setMessage('')
+    try {
+      const pendingData = window.localStorage.getItem('emora_pending_setup')
+      if (!pendingData) throw new Error('بيانات إعداد الشركة غير موجودة. أعد بدء التسجيل.')
+      const payload: SetupPayload = JSON.parse(pendingData)
+      if (payload.email.trim().toLowerCase() !== verificationEmail.trim().toLowerCase()) {
+        throw new Error('البريد لا يطابق بيانات التسجيل. أعد بدء التسجيل بالبريد نفسه.')
+      }
+
+      const supabase = createClient()
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: verificationEmail,
+        token: code,
+        type: 'email',
+      })
+      if (verifyError) throw verifyError
+      const verifiedEmail = data.user?.email?.trim().toLowerCase()
+      if (!data.session || verifiedEmail !== payload.email.trim().toLowerCase()) {
+        throw new Error('تم التحقق من حساب مختلف عن بيانات إعداد الشركة. سجّل الدخول بالبريد المستخدم للتسجيل.')
+      }
+
+      setVerificationPending(false)
+      await bootstrapCompany(payload)
+    } catch (caught) {
+      const detail = formatAppError(caught, '')
+      const normalizedDetail = detail.toLowerCase()
+      setError(
+        normalizedDetail.includes('expired') || normalizedDetail.includes('invalid') || normalizedDetail.includes('otp_expired')
+          ? 'الرمز غير صالح أو انتهت صلاحيته. أعد إرسال رمز جديد ثم أدخل أحدث رمز وصلك.'
+          : detail || 'تعذر التحقق من الرمز. تأكد من صحته أو أعد إرسال رمز جديد.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function resendSignupOtp() {
+    if (!verificationEmail) return
+    setResendingCode(true)
+    setError('')
+    setMessage('')
+    try {
+      const supabase = createClient()
+      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email: verificationEmail })
+      if (resendError) throw resendError
+      setOtpCode('')
+      setMessage('تم إرسال رمز تحقق جديد. استخدم أحدث رمز وصلك إلى البريد الإلكتروني.')
+    } catch (caught) {
+      setError(formatAppError(caught, 'تعذر إعادة إرسال الرمز. حاول بعد قليل أو سجّل الدخول إذا كان الحساب مؤكداً بالفعل.'))
+    } finally {
+      setResendingCode(false)
     }
   }
 
@@ -245,11 +331,37 @@ export function SetupForm() {
               </div>
             </div>
           </div>
+          {verificationPending ? (
+            <div className="form-section">
+              <div className="section-icon"><Mail size={22}/></div>
+              <div className="section-fields">
+                <h2>تأكيد البريد الإلكتروني</h2>
+                <p>أدخل رمز التحقق المكوّن من 6 أرقام المرسل إلى {verificationEmail}.</p>
+                <label className="full-column">رمز التحقق
+                  <input
+                    name="signupOtp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    dir="ltr"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={event => setOtpCode(normalizeSignupOtp(event.target.value))}
+                    placeholder="123456"
+                    aria-label="رمز التحقق المكوّن من 6 أرقام"
+                  />
+                </label>
+                <button className="button" type="button" onClick={resendSignupOtp} disabled={resendingCode || loading}>
+                  {resendingCode ? 'جارٍ إعادة الإرسال...' : 'إعادة إرسال الرمز'}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {authPending ? <div className="form-success" role="status" aria-live="polite">جارٍ تأكيد البريد الإلكتروني واستعادة جلسة الدخول...</div> : null}
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           {message ? <div className="form-success"><CheckCircle2 size={18}/>{message}</div> : null}
-          <button className="button button-primary button-full" disabled={loading || authPending}>
-            {authPending ? 'جارٍ تأكيد البريد الإلكتروني...' : loading ? 'جارٍ إنشاء الشركة...' : 'إنشاء الشركة والدخول'}
+          <button className="button button-primary button-full" disabled={loading || authPending || resendingCode}>
+            {authPending ? 'جارٍ تأكيد البريد الإلكتروني...' : loading ? 'جارٍ إكمال العملية...' : verificationPending ? 'تأكيد الرمز وإنشاء الشركة' : 'إنشاء الشركة والدخول'}
           </button>
         </form>
       </section>
