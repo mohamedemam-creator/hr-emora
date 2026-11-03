@@ -1,0 +1,4 @@
+-- Deferred lockdown note only; intentionally no executable SQL.
+-- Access restriction is prepared in
+-- 20261101050000_lockdown_legacy_table_access.sql. Apply it only after the
+-- replacement RPC and Edge Function paths have been deployed and verified.

@@ -17,9 +17,7 @@ type PermissionRequest = {
 const statusLabels:Record<string,string>={
   pending:'قيد المراجعة',approved:'معتمد',rejected:'مرفوض',cancelled:'ملغي',
 }
-const stageLabels:Record<string,string>={
-  branch:'بانتظار مدير الفرع',region:'بانتظار مدير المنطقة',completed:'مكتمل',
-}
+const stageLabels:Record<string,string>={branch:'بانتظار اعتماد مدير الفرع',region:'بانتظار الاعتماد النهائي لمدير المنطقة',completed:'مكتمل'}
 const typeLabels:Record<string,string>={
   late_arrival:'تأخير حضور',early_leave:'انصراف مبكر',
 }
@@ -37,7 +35,7 @@ function currentMonth(){
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`
 }
 
-type Access={roles?:Array<{code:string;name:string}>}
+type Access={permissions?:string[]}
 
 export default function HourPermissionsPage(){
   const [access,setAccess]=useState<Access>({})
@@ -50,22 +48,18 @@ export default function HourPermissionsPage(){
   const [reviewing,setReviewing]=useState<{request:PermissionRequest;approve:boolean}|null>(null)
   const [notes,setNotes]=useState('')
 
-  const managerWorkflow=useMemo(()=>{
-    const roles=new Set((access.roles??[]).map(role=>role.code))
-    return roles.has('BRANCH_MANAGER')||roles.has('REGION_MANAGER')||roles.has('SUPER_ADMIN')
-  },[access.roles])
+  const managerWorkflow=useMemo(()=>new Set(access.permissions??[]).has('hour_permissions.approve'),[access.permissions])
 
   async function load(){
     setLoading(true);setError('')
     const supabase=createClient()
     let useWorkflow=managerWorkflow
-    if((access.roles??[]).length===0){
+    if(!access.permissions){
       const accessResult=await supabase.rpc('app_current_access')
       if(!accessResult.error&&accessResult.data){
         const nextAccess=accessResult.data as Access
         setAccess(nextAccess)
-        const roles=new Set((nextAccess.roles??[]).map(role=>role.code))
-        useWorkflow=roles.has('BRANCH_MANAGER')||roles.has('REGION_MANAGER')||roles.has('SUPER_ADMIN')
+        useWorkflow=new Set(nextAccess.permissions??[]).has('hour_permissions.approve')
       }
     }
     const {data,error:rpcError}=await supabase.rpc(
@@ -100,9 +94,9 @@ export default function HourPermissionsPage(){
 
   return <main className="dashboard-content">
     <section className="page-heading management-heading"><div>
-      <span className="eyebrow">اعتماد مدير الفرع ثم مدير المنطقة</span>
+      <span className="eyebrow">مراجعة أذون الساعات للشركة</span>
       <h1>أذون الساعات</h1>
-      <p>الموظف يرسل الإذن لمدير الفرع أولًا ثم مدير المنطقة. طلب مدير الفرع لنفسه يذهب مباشرة لمدير المنطقة.</p>
+      <p>تظهر الطلبات للمستخدمين الذين لديهم صلاحية مراجعة أذون الساعات داخل الشركة.</p>
     </div></section>
 
     {error&&<div className="form-error management-message">{error}</div>}
@@ -140,10 +134,10 @@ export default function HourPermissionsPage(){
           <td>{typeLabels[row.permission_type]??row.permission_type}</td>
           <td>{formatMinutes(row.requested_minutes)}</td><td className="wide-cell">{row.reason??'—'}</td>
           <td><span className={`status-badge ${row.status}`}>{statusLabels[row.status]??row.status}</span></td>
-          <td><div className="primary-cell"><strong>{managerWorkflow?stageLabels[row.approval_stage??'completed']??row.approval_stage:'مراجعة مباشرة'}</strong>
+          <td><div className="primary-cell"><strong>{stageLabels[row.approval_stage??'completed']??row.approval_stage}</strong>
             {row.branch_reviewer_name&&<span>مدير الفرع: {row.branch_reviewer_name}</span>}
             {row.region_reviewer_name&&<span>مدير المنطقة: {row.region_reviewer_name}</span>}</div></td>
-          <td>{(managerWorkflow?row.can_review:row.status==='pending')?<div className="row-actions">
+          <td>{row.can_review?<div className="row-actions">
             <button title="اعتماد" onClick={()=>setReviewing({request:row,approve:true})}><Check size={17}/></button>
             <button className="danger" title="رفض" onClick={()=>setReviewing({request:row,approve:false})}><X size={17}/></button>
           </div>:row.status==='pending'?<span className="status-badge neutral">للمتابعة</span>:
@@ -157,7 +151,7 @@ export default function HourPermissionsPage(){
         <button className="modal-close" onClick={()=>setReviewing(null)}><XCircle/></button>
         <h2>{reviewing.approve?'اعتماد إذن الساعات':'رفض إذن الساعات'}</h2>
         <p>{reviewing.request.employee_name} — {reviewing.request.permission_date} — {typeLabels[reviewing.request.permission_type]}</p>
-        <div className="form-note">المرحلة الحالية: {managerWorkflow?stageLabels[reviewing.request.approval_stage??'completed']??reviewing.request.approval_stage:'مراجعة مباشرة'}</div>
+        <div className="form-note">المرحلة الحالية: {stageLabels[reviewing.request.approval_stage??'completed']??reviewing.request.approval_stage}</div>
         <label>ملاحظات المدير<textarea rows={4} value={notes} onChange={event=>setNotes(event.target.value)}/></label>
         <button className={`button button-full ${reviewing.approve?'button-primary':'button-danger-soft'}`}
           disabled={loading} onClick={()=>void review()}>

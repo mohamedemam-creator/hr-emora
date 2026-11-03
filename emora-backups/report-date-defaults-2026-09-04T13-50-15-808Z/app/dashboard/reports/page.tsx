@@ -134,7 +134,7 @@ export default function ReportsPage(){
       }))
       const workbook=XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(data),'Attendance')
-      XLSX.writeFile(workbook,`Selin_Attendance_${from}_${to}.xlsx`)
+      XLSX.writeFile(workbook,`Emora_Attendance_${from}_${to}.xlsx`)
       return
     }
 
@@ -160,7 +160,7 @@ export default function ReportsPage(){
     }))
     const workbook=XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(data),'Branch Open Close')
-    XLSX.writeFile(workbook,`Selin_Branch_Open_Close_${from}_${to}.xlsx`)
+    XLSX.writeFile(workbook,`Emora_Branch_Open_Close_${from}_${to}.xlsx`)
   }
 
   return <main className="dashboard-content">

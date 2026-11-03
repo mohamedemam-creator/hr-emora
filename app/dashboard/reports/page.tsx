@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 
 type Branch={id:string;name:string;code:string}
 type Row={shift_date:string;employee_code:string;employee_name:string;branch_name:string;region_name:string|null;day_type:string;planned_start:string|null;planned_end:string|null;check_in:string|null;check_out:string|null;attendance_status:string;late_minutes:number;worked_minutes:number}
-type Access={roles?:Array<{code:string}>}
 type BranchOpsRow={
   report_date:string
   branch_id:string
@@ -75,12 +74,12 @@ export default function ReportsPage(){
   const [branches,setBranches]=useState<Branch[]>([])
   const [rows,setRows]=useState<Row[]>([])
   const [branchRows,setBranchRows]=useState<BranchOpsRow[]>([])
-  const [roles,setRoles]=useState<string[]>([])
+  const [permissions,setPermissions]=useState<string[]>([])
   const [activeReport,setActiveReport]=useState<'attendance'|'branch_ops'>('attendance')
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
 
-  const canViewBranchOps=roles.includes('SUPER_ADMIN')||roles.includes('REGION_MANAGER')
+  const canViewBranchOps=permissions.includes('reports.view')
 
   async function load(mode:'attendance'|'branch_ops'=activeReport){
     setLoading(true);setError('')
@@ -100,7 +99,7 @@ export default function ReportsPage(){
     else setBranchRows((reportResult.data??[]) as BranchOpsRow[])
 
     if(workspaceResult.data)setBranches((workspaceResult.data as {branches:Branch[]}).branches??[])
-    if(accessResult.data)setRoles(((accessResult.data as Access).roles??[]).map(role=>role.code))
+    if(accessResult.data)setPermissions(((accessResult.data as {permissions?:string[]}).permissions??[]))
     setLoading(false)
   }
 

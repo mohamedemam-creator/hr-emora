@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
+import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { Logo } from '@/components/logo'
+import { formatAppError, hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
 type SetupPayload = {
@@ -22,7 +24,6 @@ export function SetupForm() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  // Complete company bootstrap after email confirmation (session is set by /auth/callback)
   useEffect(() => {
     async function handleEmailCallback() {
       if (searchParams.get('error') === 'auth') {
@@ -38,12 +39,11 @@ export function SetupForm() {
         const payload: SetupPayload = JSON.parse(pendingData)
         const supabase = createClient()
         const { data: sessionData } = await supabase.auth.getSession()
-
         if (sessionData.session?.user) {
-          await bootstrapCompanyDirect(payload, sessionData.session.user.id)
+          await bootstrapCompany(payload)
         }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'تعذر إكمال إعداد الشركة تلقائياً')
+        setError(formatAppError(err, 'تعذر إكمال إعداد الشركة تلقائياً'))
       } finally {
         setLoading(false)
       }
@@ -52,32 +52,54 @@ export function SetupForm() {
     handleEmailCallback()
   }, [searchParams])
 
-  async function bootstrapCompanyDirect(payload: SetupPayload, userId: string) {
+  async function bootstrapCompany(payload: SetupPayload) {
     const supabase = createClient()
-
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .insert([{ name: payload.companyName, code: payload.companyCode }])
-      .select()
-      .single()
-
-    if (companyError) throw companyError
-
-    const { error: empError } = await supabase.from('employees').insert([
-      {
-        company_id: company.id,
-        user_id: userId,
-        full_name: payload.adminName,
-        email: payload.email,
-        role: 'company_admin',
-        device_id: payload.employeeCode,
+    const { data, error: functionError } = await supabase.functions.invoke('bootstrap-company', {
+      body: {
+        companyName: payload.companyName,
+        companyCode: payload.companyCode,
+        adminName: payload.adminName,
+        employeeCode: payload.employeeCode,
+        phone: payload.phone,
       },
-    ])
+    })
 
-    if (empError) throw empError
+    if (functionError) {
+      let message = formatAppError(functionError, 'تعذر إنشاء الشركة عبر خدمة الإعداد.')
+      if (functionError instanceof FunctionsFetchError) {
+        message = 'تعذر الاتصال بدالة bootstrap-company. تأكد من تشغيل Supabase المحلي والدالة محلياً، أو من نشر الدالة على مشروع Supabase المُعدّ للتطبيق.'
+      }
+      if (functionError instanceof FunctionsHttpError) {
+        try {
+          const body = await functionError.context.json()
+          message = formatAppError(body, message)
+        } catch {
+          // keep the function error message
+        }
+      }
+      throw new Error(message)
+    }
+
+    if (data?.error) {
+      throw new Error(formatAppError(data.error, 'تعذر إنشاء الشركة.'))
+    }
 
     window.localStorage.removeItem('emora_pending_setup')
-    router.push('/dashboard')
+    if (data?.auditLogged === false) {
+      throw new Error('تم إنشاء الشركة بنجاح، لكن تعذر حفظ سجل التدقيق. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع مسؤول النظام.')
+    }
+    const { data: accessData, error: accessError } = await supabase.rpc('app_current_access')
+    if (accessError) {
+      throw new Error('تم إنشاء الشركة، لكن تعذر تحميل صلاحيات الدخول. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع الدعم.')
+    }
+    const access = accessData as AppAccess | null
+    const isOwnerOfCreatedCompany =
+      access?.company_id === data?.companyId &&
+      access?.roles?.some(role => role.code === 'COMPANY_OWNER')
+    if (!isOwnerOfCreatedCompany) {
+      throw new Error('تم إنشاء الشركة، لكن تعذر تأكيد عضوية المالك. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع الدعم.')
+    }
+    router.push(hasAdminAccess(access) ? '/dashboard' : '/portal')
     router.refresh()
   }
 
@@ -99,47 +121,47 @@ export function SetupForm() {
       email,
     }
 
+    if (!payload.companyName || !payload.companyCode || !payload.adminName || !payload.employeeCode || !email) {
+      setError('أكمل جميع البيانات المطلوبة.')
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       const { data: sessionData } = await supabase.auth.getSession()
+      let hasSession = Boolean(sessionData.session?.user)
 
-      let activeUserId = sessionData.session?.user?.id
-
-      if (!activeUserId) {
+      if (!hasSession) {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (!signInError && signInData.session) {
-          activeUserId = signInData.session.user.id
+          hasSession = true
         } else {
           window.localStorage.setItem('emora_pending_setup', JSON.stringify(payload))
-
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback?next=/setup`,
+              emailRedirectTo: `${(process.env.NEXT_PUBLIC_APP_URL || 'https://hr-emora.vercel.app').replace(/\/$/, '')}/auth/callback`,
+              data: { full_name: payload.adminName },
             },
           })
-
           if (signUpError) throw signUpError
-
-          if (signUpData.session) {
-            activeUserId = signUpData.session.user.id
-          } else {
-            setMessage('تم إرسال رابط التأكيد إلى بريدك. بعد الضغط على Confirm f-الإيميل، سيتم إنشاء الشركة والدخول تلقائياً!')
+          hasSession = Boolean(signUpData.session)
+          if (!hasSession) {
+            setMessage('تم إرسال رابط التأكيد إلى بريدك. بعد تأكيد الإيميل سيتم إنشاء الشركة تلقائياً.')
             return
           }
         }
       }
 
-      if (activeUserId) {
-        await bootstrapCompanyDirect(payload, activeUserId)
-      }
+      await bootstrapCompany(payload)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'تعذر إكمال إعداد الشركة')
+      setError(formatAppError(caught, 'تعذر إكمال إعداد الشركة'))
     } finally {
       setLoading(false)
     }
@@ -153,25 +175,25 @@ export function SetupForm() {
       </header>
       <section className="setup-card">
         <div className="setup-intro">
-          <span className="eyebrow">ابدأ مع Emora</span>
+          <span className="eyebrow">ابدأ مع Emora HR</span>
           <h1>أنشئ مساحة شركتك</h1>
-          <p>سيصبح هذا الحساب مدير النظام الرئيسي، وبعدها ستضيف مديري المناطق والفروع من داخل البرنامج.</p>
+          <p>سيصبح هذا الحساب مالك الشركة الجديدة، ويمكنك بعدها إضافة الفروع والموظفين وتحديد أدوارهم من داخل الشركة.</p>
         </div>
-        <form className="setup-form" onSubmit={submit}>
+        <form className="setup-form" onSubmit={submit} noValidate>
           <div className="form-section">
             <div className="section-icon"><Building2 size={22}/></div>
             <div className="section-fields">
               <h2>بيانات الشركة</h2>
               <div className="two-columns">
-                <label>اسم الشركة<input required name="companyName" placeholder="مثال: شركة ايمورا للتجارة" /></label>
-                <label>كود الشركة<input required name="companyCode" minLength={2} maxLength={20} pattern="[A-Za-z0-9_\-]+" placeholder="Emora01" /></label>
+                <label>اسم الشركة<input required name="companyName" placeholder="مثال: إمورا للحلول المباشرة" /></label>
+                <label>كود الشركة<input required name="companyCode" minLength={2} maxLength={20} pattern="[A-Za-z0-9_\-]+" title="حروف وأرقام وشرطة وشرطة سفلية فقط" placeholder="Emora01" /></label>
               </div>
             </div>
           </div>
           <div className="form-section">
             <div className="section-icon"><UserRound size={22}/></div>
             <div className="section-fields">
-              <h2>مدير النظام</h2>
+              <h2>مالك الشركة</h2>
               <div className="two-columns">
                 <label>الاسم الكامل<input required name="adminName" placeholder="الاسم بالكامل" /></label>
                 <label>كود الموظف<input required name="employeeCode" placeholder="EMP001" /></label>
@@ -181,8 +203,8 @@ export function SetupForm() {
               </div>
             </div>
           </div>
-          {error && <div className="form-error">{error}</div>}
-          {message && <div className="form-success"><CheckCircle2 size={18}/>{message}</div>}
+          {error ? <div className="form-error">{error}</div> : null}
+          {message ? <div className="form-success"><CheckCircle2 size={18}/>{message}</div> : null}
           <button className="button button-primary button-full" disabled={loading}>
             {loading ? 'جارٍ إنشاء الشركة...' : 'إنشاء الشركة والدخول'}
           </button>

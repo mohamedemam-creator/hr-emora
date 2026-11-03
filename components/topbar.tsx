@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, Menu, Search } from 'lucide-react'
+import { Bell, Menu } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Access = {
@@ -15,8 +16,30 @@ export function Topbar({
 }: {
   onMenuToggle?: () => void
 }) {
+  const pathname = usePathname()
   const [access, setAccess] = useState<Access>({})
   const [unreadCount, setUnreadCount] = useState(0)
+
+  const pageTitle = useMemo(() => {
+    const titles: Array<[string, string]> = [
+      ['/dashboard/employees', 'الموظفون'],
+      ['/dashboard/branches', 'الفروع'],
+      ['/dashboard/regions', 'المناطق'],
+      ['/dashboard/organization', 'الهيكل الوظيفي'],
+      ['/dashboard/roles', 'الأدوار والصلاحيات'],
+      ['/dashboard/shifts', 'الشيفتات'],
+      ['/dashboard/attendance', 'الحضور والانصراف'],
+      ['/dashboard/leaves', 'الإجازات'],
+      ['/dashboard/permissions', 'الأذونات'],
+      ['/dashboard/penalties', 'الجزاءات'],
+      ['/dashboard/payroll', 'الرواتب'],
+      ['/dashboard/notifications', 'التنبيهات'],
+      ['/dashboard/reports', 'التقارير'],
+      ['/dashboard/settings', 'الإعدادات'],
+      ['/portal', 'بوابتي والحضور'],
+    ]
+    return titles.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'نظرة عامة'
+  }, [pathname])
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,9 +77,9 @@ export function Topbar({
         <Menu />
       </button>
 
-      <div className="search-box">
-        <Search size={18} />
-        <input placeholder="ابحث في النظام..." />
+      <div className="topbar-context" aria-live="polite">
+        <span>مساحة العمل</span>
+        <strong>{pageTitle}</strong>
       </div>
 
       <div className="topbar-actions">

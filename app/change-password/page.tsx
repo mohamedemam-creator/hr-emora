@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, KeyRound, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
+import { hasAdminAccess, type AppAccess } from '@/lib/app-access'
 
 export default function ChangePasswordPage() {
   const router = useRouter()
@@ -34,10 +35,9 @@ export default function ChangePasswordPage() {
       if (updateError) throw updateError
       await supabase.rpc('app_clear_password_change_flag')
       setSuccess('تم تغيير كلمة المرور بنجاح.')
-      const { data: access } = await supabase.rpc('app_current_access')
-      const permissions = ((access as { permissions?: string[] })?.permissions ?? [])
-      const hasAdminAccess = permissions.some(code => !['shifts.view_own', 'attendance.view_own'].includes(code))
-      setTimeout(() => router.replace(hasAdminAccess ? '/dashboard' : '/portal'), 500)
+      const { data: accessData } = await supabase.rpc('app_current_access')
+      const access = accessData as AppAccess | null
+      setTimeout(() => router.replace(access?.is_platform_admin ? '/platform' : hasAdminAccess(access) ? '/dashboard' : '/portal'), 500)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'تعذر تغيير كلمة المرور.')
     } finally {
@@ -51,7 +51,7 @@ export default function ChangePasswordPage() {
         <Logo />
         <div className="module-placeholder-icon"><KeyRound size={34}/></div>
         <h1>تغيير كلمة المرور</h1>
-        <p>هذه أول مرة تدخل فيها إلى Selin. اختر كلمة مرور جديدة خاصة بك.</p>
+        <p>هذه أول مرة تدخل فيها إلى Emora. اختر كلمة مرور جديدة خاصة بك.</p>
         <form className="form-stack" onSubmit={submit}>
           <label>كلمة المرور الجديدة<input name="password" type="password" required minLength={8}/></label>
           <label>تأكيد كلمة المرور<input name="confirmPassword" type="password" required minLength={8}/></label>

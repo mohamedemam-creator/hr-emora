@@ -44,6 +44,7 @@ type Employee = {
   has_login: boolean
   login_enabled: boolean
   must_change_password: boolean
+  account_invited_at: string | null
   role_ids: string[]
   role_names: string
   created_at: string
@@ -195,12 +196,8 @@ export default function EmployeesPage() {
   const filteredJobs = useMemo(() => options.job_titles.filter(job => !form.departmentId || job.department_id === form.departmentId), [options.job_titles, form.departmentId])
   const filteredManagers = useMemo(() => options.managers.filter(manager => manager.id !== form.id && (!form.branchId || !manager.branch_id || manager.branch_id === form.branchId)), [options.managers, form.id, form.branchId])
 
-  const currentRoles = useMemo(
-    () => new Set((access.roles ?? []).map(role => role.code)),
-    [access.roles],
-  )
-  const canDeleteEmployee =
-    currentRoles.has('SUPER_ADMIN') || currentRoles.has('REGION_MANAGER')
+  const canAssignRoles = Boolean(access.permissions?.includes('employees.assign_roles') || access.permissions?.includes('roles.manage'))
+  const canDeleteEmployee = Boolean(access.permissions?.includes('employees.delete'))
 
   async function openCreate() {
     setError('')
@@ -263,35 +260,17 @@ export default function EmployeesPage() {
     const currentEmail = (currentEmployee?.email ?? '').trim().toLowerCase()
 
     if (currentEmployee?.has_login && currentEmail !== nextEmail) {
-      if (!nextEmail) {
-        setError('لا يمكن حذف البريد من موظف لديه حساب دخول. غيّر البريد إلى بريد آخر صحيح.')
-        setSaving(false)
-        return
-      }
-
-      const { data: syncResult, error: syncError } =
-        await supabase.functions.invoke('manage-employee-account', {
-          body: {
-            action: 'update-email',
-            employeeId: currentEmployee.id,
-            email: nextEmail,
-          },
-        })
-
-      if (syncError || syncResult?.error) {
-        const message = syncResult?.error
-          ? String(syncResult.error)
-          : await edgeFunctionErrorMessage(
-              syncError,
-              'تعذر تحديث بريد تسجيل الدخول.',
-            )
-        setError(humanError(message))
-        setSaving(false)
-        return
-      }
+      setError('لا يمكن للمدير تغيير بريد Auth مباشرة. يجب أن يبدأ الموظف تغيير البريد من حسابه ويؤكده عبر البريد الجديد.')
+      setSaving(false)
+      return
+    }
+    if (!form.id && !nextEmail) {
+      setError('البريد الإلكتروني مطلوب لإرسال دعوة تفعيل الموظف.')
+      setSaving(false)
+      return
     }
 
-    const { error: rpcError } = await supabase.rpc('app_save_employee_v2', {
+    const { data: savedEmployeeId, error: rpcError } = await supabase.rpc('app_save_employee_v2', {
       p_employee_id: form.id,
       // New employees are allocated atomically by the database.
       // The displayed code is a preview only; edit keeps the existing immutable code.
@@ -309,12 +288,36 @@ export default function EmployeesPage() {
       p_base_salary: Number(form.baseSalary || 0),
       p_overtime_hour_rate: Number(form.overtimeRate || 0),
       p_status: form.status,
-      p_role_ids: form.roleIds,
+      p_role_ids: canAssignRoles ? form.roleIds : null,
     })
 
-    if (rpcError) setError(humanError(rpcError.message))
-    else {
-      setSuccess(form.id ? 'تم تحديث الموظف بنجاح.' : 'تمت إضافة الموظف بنجاح.')
+    if (rpcError) {
+      setError(humanError(rpcError.message))
+    } else if (!form.id) {
+      const newEmployeeId = String(savedEmployeeId ?? '')
+      const { data: inviteData, error: inviteError } = await supabase.functions.invoke('manage-employee-account', {
+        body: { action: 'invite', employeeId: newEmployeeId },
+      })
+      if (inviteError || inviteData?.error) {
+        const message = inviteData?.error
+          ? String(inviteData.error)
+          : await edgeFunctionErrorMessage(inviteError, 'تعذر إرسال دعوة التفعيل.')
+        await loadData()
+        setView('list')
+        if (message.includes('Auth account already uses this email')) {
+          setSuccess('تم حفظ الموظف. يوجد حساب Auth بهذا البريد؛ على الموظف تسجيل الدخول بحسابه لقبول دعوة الشركة.')
+        } else {
+          setError(`تم حفظ سجل الموظف، لكن لم تكتمل الدعوة: ${message} افتح إجراء حساب الدخول لمحاولة الإرسال مجدداً؛ لا تضف الموظف مرة أخرى.`)
+        }
+      } else {
+        await loadData()
+        setSuccess(inviteData?.auditLogged === false
+          ? 'تم حفظ الموظف وإرسال الدعوة. تعذر حفظ سجل التدقيق؛ لا تكرر الإضافة.'
+          : 'تم حفظ الموظف وإرسال دعوة التفعيل إلى بريده.')
+        setTimeout(closeForm, 900)
+      }
+    } else {
+      setSuccess('تم تحديث الموظف بنجاح.')
       await loadData()
       setTimeout(closeForm, 650)
     }
@@ -457,7 +460,7 @@ export default function EmployeesPage() {
             </label>
             <label>الاسم الكامل<input required value={form.fullName} onChange={event => setForm(current => ({ ...current, fullName: event.target.value }))}/></label>
             <label>رقم الهاتف<input value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))}/></label>
-            <label>البريد الإلكتروني<input type="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))}/></label>
+            <label>البريد الإلكتروني<input required={!form.id} type="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))}/></label>
             <label className="full-column">عنوان الموظف<input value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} placeholder="العنوان بالتفصيل"/></label>
             <label>الفرع<select value={form.branchId} onChange={event => setForm(current => ({ ...current, branchId: event.target.value, managerId: '' }))}><option value="">بدون فرع</option>{options.branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} — {branch.code}</option>)}</select></label>
             <label>القسم<select value={form.departmentId} onChange={event => setForm(current => ({ ...current, departmentId: event.target.value, jobTitleId: '' }))}><option value="">بدون قسم</option>{options.departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -470,7 +473,7 @@ export default function EmployeesPage() {
             <label>سعر ساعة الأوفر تايم<input type="number" min="0" step="0.01" value={form.overtimeRate} onChange={event => setForm(current => ({ ...current, overtimeRate: event.target.value }))}/></label>
           </div>
 
-          <section className="role-picker"><h3>الأدوار والصلاحيات</h3><p>يمكن إسناد أكثر من دور للموظف. لو لم تختَر دورًا، يُستخدم الدور الافتراضي للمسمى الوظيفي.</p><div>{options.roles.map(role => <label key={role.id}><input type="checkbox" checked={form.roleIds.includes(role.id)} onChange={() => toggleRole(role.id)}/><span>{role.name}<small>{role.code}</small></span></label>)}</div></section>
+          {canAssignRoles && <section className="role-picker"><h3>الأدوار والصلاحيات</h3><p>يمكن إسناد أكثر من دور للموظف. لو لم تختَر دورًا، يُستخدم الدور الافتراضي للمسمى الوظيفي.</p><div>{options.roles.map(role => <label key={role.id}><input type="checkbox" checked={form.roleIds.includes(role.id)} onChange={() => toggleRole(role.id)}/><span>{role.name}<small>{role.code}</small></span></label>)}</div></section>}
 
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}

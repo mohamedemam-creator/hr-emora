@@ -35,7 +35,7 @@ export default function Home() {
           <div className="phone-mockup">
             <div className="phone-top"><span>9:41</span><span>● ● ●</span></div>
             <div className="phone-content">
-              <div className="avatar">م</div>
+              <div className="avatar"> A </div>
               <h3> good morrning , ali </h3>
               <p> You are within the Zayed branch area </p>
               <div className="attendance-ring"><strong>12:00</strong><span> Arrival time </span></div>

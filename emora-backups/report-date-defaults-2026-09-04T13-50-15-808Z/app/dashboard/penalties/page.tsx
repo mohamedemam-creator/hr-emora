@@ -241,7 +241,7 @@ export default function PenaltiesPage(){
       const url=URL.createObjectURL(blob)
       const anchor=document.createElement('a')
       anchor.href=url
-      anchor.download=`Selin-Penalties_${dateFrom||'all'}_${dateTo||'all'}.xlsx`
+      anchor.download=`emora-Penalties_${dateFrom||'all'}_${dateTo||'all'}.xlsx`
       document.body.appendChild(anchor);anchor.click();anchor.remove();URL.revokeObjectURL(url)
       setSuccess(`تم تصدير ${filteredRows.length} سجل إلى Excel حسب الفلاتر الحالية.`);setError('')
     }catch(caught){setError(caught instanceof Error?caught.message:'تعذر تصدير ملف Excel.')}

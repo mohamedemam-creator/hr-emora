@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { CheckCircle2, KeyRound, Loader2, Mail, Power, Smartphone, X } from 'lucide-react'
+import { CheckCircle2, KeyRound, Loader2, Power, Smartphone, X } from 'lucide-react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
@@ -45,6 +45,7 @@ type EmployeeAccount = {
   has_login: boolean
   login_enabled: boolean
   must_change_password: boolean
+  account_invited_at: string | null
 }
 
 export function EmployeeAccountPanel({
@@ -56,7 +57,6 @@ export function EmployeeAccountPanel({
   onClose: () => void
   onUpdated: () => Promise<void> | void
 }) {
-  const [email, setEmail] = useState(employee.email ?? '')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -197,8 +197,7 @@ export function EmployeeAccountPanel({
         body: {
           action,
           employeeId: employee.id,
-          email,
-          password,
+          password: employee.has_login ? password : undefined,
         },
       })
       if (functionError) {
@@ -229,7 +228,7 @@ export function EmployeeAccountPanel({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    void invoke(employee.has_login ? 'reset-password' : 'create')
+    void invoke(employee.has_login ? 'reset-password' : 'invite')
   }
 
   return (
@@ -238,35 +237,24 @@ export function EmployeeAccountPanel({
         <button className="modal-close" onClick={onClose}><X/></button>
         <div className="module-placeholder-icon"><KeyRound size={30}/></div>
         <h2>حساب دخول {employee.full_name}</h2>
-        <p>{employee.has_login ? 'يمكنك تحديث بريد تسجيل الدخول أو إعادة تعيين كلمة المرور أو تفعيل وإيقاف الحساب.' : 'أنشئ بريدًا وكلمة مرور مؤقتة للموظف.'}</p>
+        <p>{employee.has_login ? 'يمكنك إعادة تعيين كلمة المرور أو إيقاف وتفعيل الدخول. يغيّر الموظف بريده من حسابه بعد التحقق.' : employee.account_invited_at ? 'تم إرسال دعوة لهذا البريد. على الموظف فتح رسالة الدعوة أو تسجيل الدخول بحسابه الحالي لقبولها.' : 'سنرسل دعوة تفعيل آمنة إلى بريد الموظف؛ لا نضع كلمة مرور مؤقتة نيابة عنه.'}</p>
         <form className="form-stack" onSubmit={submit}>
           <label>
             بريد تسجيل الدخول
             <input
               type="email"
               required
-              value={email}
-              onChange={event => setEmail(event.target.value)}
+              value={employee.email ?? ''}
+              readOnly
             />
           </label>
-          {employee.has_login && (
-            <button
-              type="button"
-              className="button button-ghost button-full"
-              disabled={loading || !email.trim()}
-              onClick={() => void invoke('update-email')}
-            >
-              {loading ? <Loader2 className="spin" size={18}/> : <Mail size={18}/>}
-              تحديث ومزامنة بريد الدخول
-            </button>
-          )}
-          <label>{employee.has_login ? 'كلمة مرور مؤقتة جديدة' : 'كلمة المرور المؤقتة'}<input type="password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>
-          <div className="form-note">سيُطلب من الموظف تغيير كلمة المرور عند أول دخول.</div>
+          {employee.has_login && <label>كلمة مرور مؤقتة جديدة<input type="password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>}
+          {employee.has_login && <div className="form-note">سيُطلب من الموظف تغيير كلمة المرور عند أول دخول.</div>}
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
-          <button className="button button-primary button-full" disabled={loading}>
+          <button className="button button-primary button-full" disabled={loading || (!employee.has_login && Boolean(employee.account_invited_at))}>
             {loading ? <Loader2 className="spin" size={18}/> : <KeyRound size={18}/>}
-            {employee.has_login ? 'تعيين كلمة مرور جديدة' : 'إنشاء حساب الدخول'}
+            {employee.has_login ? 'تعيين كلمة مرور جديدة' : 'إرسال دعوة التفعيل'}
           </button>
         </form>
         {employee.has_login && <button className={`button button-full ${employee.login_enabled ? 'button-danger-soft' : 'button-ghost'}`} disabled={loading} onClick={() => void invoke(employee.login_enabled ? 'disable' : 'enable')}>

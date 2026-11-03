@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title Selin - Cloudflare Direct Deploy
+title Emora HR - Cloudflare Direct Deploy
 
 echo ==============================================
-echo       Selin - Cloudflare Direct Deploy
+echo       Emora HR - Cloudflare Direct Deploy
 echo ==============================================
 echo.
 
@@ -32,11 +32,11 @@ if errorlevel 1 goto :error
 
 echo.
 echo Review the account shown above.
-echo Press any key to deploy Selin to this account, or close this window to cancel.
+echo Press any key to deploy Emora HR to this account, or close this window to cancel.
 pause >nul
 
 echo.
-echo [4/4] Building and deploying Selin...
+echo [4/4] Building and deploying Emora HR...
 call npm run deploy
 if errorlevel 1 goto :error
 

@@ -265,7 +265,7 @@ export default function PortalPage(){
   }
   async function attendanceAction(action:'check_in'|'check_out'){
     if(!iosMode){
-      setError('تسجيل الحضور والانصراف من الويب متاح مؤقتًا لأجهزة iPhone المفعلة فقط. مستخدمو Android يستخدمون تطبيق Selin Team.')
+      setError('تسجيل الحضور والانصراف من الويب متاح مؤقتًا لأجهزة iPhone المفعلة فقط. مستخدمو Android يستخدمون تطبيق Emora HR Team.')
       return
     }
     if(!iosStatus?.bound){
@@ -366,7 +366,7 @@ export default function PortalPage(){
                 iosStatus?.bound?'الحضور متاح من هذا iPhone':
                 iosStatus?.pending?'بانتظار اعتماد هذا iPhone':
                 'فعّل هذا iPhone للحضور':
-              'الحضور متاح من تطبيق Selin Team على Android'}</h2>
+                'الحضور متاح من تطبيق Emora HR Team على Android'}</h2>
             <p>{todayShift?.start_time?
               `${todayShift.branch_name} • ${todayShift.start_time} - ${todayShift.end_time}`:
               data.profile.branch_name??'لم يتم تحديد الفرع'}</p>
@@ -390,7 +390,7 @@ export default function PortalPage(){
               data.open_session?<LogOut size={20}/>:<LogIn size={20}/>}
             {iosMode&&iosStatus?.bound?
               data.open_session?'تسجيل الانصراف':'تسجيل الحضور':
-              'استخدم تطبيق Selin Team'}
+              'استخدم تطبيق Emora HR Team'}
           </button>}
       </section>
 

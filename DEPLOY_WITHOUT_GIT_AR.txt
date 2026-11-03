@@ -1,4 +1,4 @@
-رفع Selin إلى Cloudflare بدون GitHub
+رفع Emora HR إلى Cloudflare بدون GitHub
 ====================================
 
 1) فك ضغط المشروع في مجلد عادي على الكمبيوتر.
@@ -10,6 +10,6 @@
 7) انسخ رابط workers.dev الذي يظهر في النهاية.
 
 مهم:
-- لا تستخدم Upload your static files، لأن Selin تطبيق Next.js يحتاج Build.
+- لا تستخدم Upload your static files، لأن Emora HR تطبيق Next.js يحتاج Build.
 - ملف .env.local يحتوي فقط على Supabase Project URL وPublishable Key المستخدمين في الواجهة.
 - لا تضع أي Service Role Key أو sb_secret_ داخل المشروع.

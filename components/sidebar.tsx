@@ -169,6 +169,14 @@ const items: Item[] = [
   },
 ]
 
+const navigationGroups = [
+  { label: 'مساحة العمل', hrefs: ['/dashboard', '/portal'] },
+  { label: 'المؤسسة', hrefs: ['/dashboard/employees', '/dashboard/regions', '/dashboard/branches', '/dashboard/organization', '/dashboard/roles'] },
+  { label: 'العمليات اليومية', hrefs: ['/dashboard/shifts', '/dashboard/attendance', '/dashboard/leaves', '/dashboard/permissions', '/dashboard/penalties', '/dashboard/payroll'] },
+  { label: 'المتابعة', hrefs: ['/dashboard/notifications', '/dashboard/reports'] },
+  { label: 'الإدارة', hrefs: ['/dashboard/settings'] },
+]
+
 export function Sidebar({
   mobileOpen = false,
   onNavigate,
@@ -219,31 +227,41 @@ export function Sidebar({
         <Logo light />
       </div>
 
-      <nav>
-        {visibleItems.map(item => {
-          const Icon = item.icon
-          const active =
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
+      <nav aria-label="التنقل الرئيسي">
+        {navigationGroups.map(group => {
+          const groupItems = visibleItems.filter(item => group.hrefs.includes(item.href))
+          if (!groupItems.length) return null
 
           return (
-            <Link
-              className={active ? 'active' : ''}
-              href={item.href}
-              key={item.label}
-              onClick={onNavigate}
-            >
-              <Icon size={19} />
-              <span>{item.label}</span>
-            </Link>
+            <section className="sidebar-group" key={group.label}>
+              <h2>{group.label}</h2>
+              {groupItems.map(item => {
+                const Icon = item.icon
+                const active = item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname.startsWith(item.href)
+
+                return (
+                  <Link
+                    className={active ? 'active' : ''}
+                    href={item.href}
+                    key={item.label}
+                    onClick={onNavigate}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <Icon size={19} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </section>
           )
         })}
       </nav>
 
       <div className="sidebar-footer">
-        <strong> Emora HR</strong>
-        <span> Human Resources Department  </span>
+        <strong>Emora HR</strong>
+        <span>إدارة الموارد البشرية</span>
       </div>
     </aside>
   )

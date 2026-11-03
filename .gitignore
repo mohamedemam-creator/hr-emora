@@ -1,7 +1,34 @@
-node_modules
-.next
-.open-next
-.env
-.env.local
-.wrangler
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build and deployment output
+.open-next/
+.vercel/
+.wrangler/
+dist/
+build/
+coverage/
+.turbo/
+
+# Local environment files (keep the template)
+.env*
+!.env.example
+
+# Supabase local CLI state
+supabase/.temp/
+
+# Logs and generated TypeScript build state
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tsbuildinfo
+
+# Operating system files
 .DS_Store
+Thumbs.db

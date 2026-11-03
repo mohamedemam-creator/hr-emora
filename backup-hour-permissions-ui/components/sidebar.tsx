@@ -224,7 +224,7 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
-        <strong>Selin HR</strong>
+        <strong>emora HR</strong>
         <span>إدارة موارد بشرية فعلية</span>
       </div>
     </aside>

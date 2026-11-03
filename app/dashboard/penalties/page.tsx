@@ -23,7 +23,7 @@ type Access={permissions?:string[];roles?:Array<{code:string;name:string}>}
 const typeLabels:Record<string,string>={
   warning:'إنذار',deduction_amount:'خصم مبلغ',deduction_days:'خصم أيام',other:'جزاء آخر',
 }
-const requestStatusLabels:Record<string,string>={pending:'بانتظار مدير المنطقة',approved:'تم الاعتماد',rejected:'مرفوض',cancelled:'ملغي'}
+const requestStatusLabels:Record<string,string>={pending:'بانتظار مالك الشركة',approved:'تم الاعتماد',rejected:'مرفوض',cancelled:'ملغي'}
 
 
 function dateInputValue(date:Date){
@@ -142,14 +142,11 @@ export default function PenaltiesPage(){
     effectiveDate:new Date().toISOString().slice(0,10),
   })
 
-  const roles=useMemo(()=>new Set((access.roles??[]).map(role=>role.code)),[access.roles])
-  const isBranchManager=roles.has('BRANCH_MANAGER')
-  const isRegionManager=roles.has('REGION_MANAGER')
-  const isSuperAdmin=roles.has('SUPER_ADMIN')
   const permissions=useMemo(()=>new Set(access.permissions??[]),[access.permissions])
   const hasPenaltyManage=permissions.has('penalties.manage')
-  const canCreatePenalty=isBranchManager||isSuperAdmin||hasPenaltyManage
-  const canCancelActualPenalty=isRegionManager||isSuperAdmin||hasPenaltyManage
+  const hasPenaltyApprove=permissions.has('penalties.approve')
+  const canCreatePenalty=hasPenaltyManage
+  const canCancelActualPenalty=hasPenaltyApprove
 
   async function load(){
     setLoading(true);setError('')
@@ -160,8 +157,8 @@ export default function PenaltiesPage(){
       nextAccess=accessResult.data as Access
       setAccess(nextAccess)
     }
-    const roleCodes=new Set((nextAccess.roles??[]).map(role=>role.code))
-    const shouldLoadApprovalQueue=roleCodes.has('BRANCH_MANAGER')||roleCodes.has('REGION_MANAGER')||roleCodes.has('SUPER_ADMIN')
+    const currentPermissions=new Set(nextAccess.permissions??[])
+    const shouldLoadApprovalQueue=currentPermissions.has('penalties.approve')
 
     const [penaltyResult,employeeResult,requestResult]=await Promise.all([
       supabase.rpc('app_list_penalties'),
@@ -188,14 +185,14 @@ export default function PenaltiesPage(){
       p_title:form.title,p_reason:form.reason,p_amount:Number(form.amount||0),
       p_deduction_days:Number(form.deductionDays||0),p_effective_date:form.effectiveDate,
     }
-    const result=isBranchManager&&!isSuperAdmin
+    const result=hasPenaltyManage&&!hasPenaltyApprove
       ?await supabase.rpc('app_submit_penalty_for_approval',args)
       :await supabase.rpc('app_save_penalty',args)
 
     if(result.error)setError(result.error.message)
     else{
-      setSuccess(isBranchManager&&!isSuperAdmin
-        ?result.data?.message?String(result.data.message):'تم إرسال الجزاء إلى مدير المنطقة للاعتماد.'
+      setSuccess(hasPenaltyManage&&!hasPenaltyApprove
+        ?result.data?.message?String(result.data.message):'تم إرسال الجزاء إلى مالك الشركة للمراجعة.'
         :'تم تسجيل الجزاء مباشرة.')
       setOpen(false)
       setForm(current=>({...current,employeeId:'',title:'',reason:'',amount:'0',deductionDays:'0'}))
@@ -261,9 +258,9 @@ export default function PenaltiesPage(){
 
   return <main className="dashboard-content">
     <section className="page-heading management-heading">
-      <div><span className="eyebrow">اعتماد نهائي من مدير المنطقة</span>
+      <div><span className="eyebrow">اعتماد الجزاءات داخل الشركة</span>
         <h1>الجزاءات</h1>
-        <p>مدير الفرع يرفع الجزاء لموظف داخل فرعه، ولا يصبح جزاءً فعليًا ولا يدخل الرواتب إلا بعد اعتماد مدير المنطقة.</p></div>
+        <p>يصبح الجزاء المرفوع من مدير الشركة فعليًا بعد مراجعته من صاحب صلاحية الاعتماد.</p></div>
       {canCreatePenalty&&<button className="button button-primary" onClick={()=>setOpen(true)}>
         <Plus size={18}/> إضافة طلب جزاء</button>}
     </section>
@@ -352,7 +349,7 @@ export default function PenaltiesPage(){
     {open&&<div className="modal-backdrop"><form className="account-modal" onSubmit={submit}>
       <button type="button" className="modal-close" onClick={()=>setOpen(false)}><XCircle/></button>
       <div className="module-placeholder-icon"><AlertTriangle size={30}/></div><h2>إضافة طلب جزاء</h2>
-      {isBranchManager&&!isSuperAdmin&&<div className="form-note">سيتم إرسال الجزاء إلى مدير المنطقة، ولن يدخل سجل الموظف أو الرواتب قبل الاعتماد النهائي.</div>}
+      {hasPenaltyManage&&!hasPenaltyApprove&&<div className="form-note">سيتم إرسال الجزاء إلى مالك الشركة، ولن يصبح فعليًا قبل اعتماده.</div>}
       <label>الموظف<select required value={form.employeeId} onChange={e=>setForm(c=>({...c,employeeId:e.target.value}))}>
         <option value="">اختر الموظف</option>{employees.map(e=><option key={e.id} value={e.id}>
           {e.full_name} — {e.employee_code} — {e.branch_name??'بدون فرع'}</option>)}</select></label>
@@ -375,7 +372,7 @@ export default function PenaltiesPage(){
       <section className="account-modal"><button className="modal-close" onClick={()=>setReviewing(null)}><XCircle/></button>
         <h2>{reviewing.approve?'اعتماد الجزاء':'رفض طلب الجزاء'}</h2>
         <p>{reviewing.request.employee_name} — {reviewing.request.title}</p>
-        <label>ملاحظات مدير المنطقة<textarea rows={4} value={reviewNote} onChange={event=>setReviewNote(event.target.value)}/></label>
+        <label>ملاحظات المراجع<textarea rows={4} value={reviewNote} onChange={event=>setReviewNote(event.target.value)}/></label>
         <button className={`button button-full ${reviewing.approve?'button-primary':'button-danger-soft'}`}
           disabled={loading} onClick={()=>void reviewPenaltyRequest()}>
           {loading?<Loader2 className="spin" size={18}/>:reviewing.approve?<Check size={18}/>:<X size={18}/>}

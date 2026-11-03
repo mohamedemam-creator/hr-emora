@@ -306,7 +306,7 @@ export default function PortalPage(){
         setSuccess('هذا المتصفح مفعل بالفعل للحضور لهذا الحساب.')
       }else{
         setSuccess(
-          `تم إرسال طلب تفعيل جهاز الحضور${result?.requestCode?` — كود الطلب ${result.requestCode}`:''}. بانتظار موافقة مدير المنطقة أو مدير النظام.`,
+          `تم إرسال طلب تفعيل جهاز الحضور${result?.requestCode?` — كود الطلب ${result.requestCode}`:''}. بانتظار موافقة مالك الشركة.`,
         )
       }
     }catch(caught){
@@ -436,14 +436,14 @@ export default function PortalPage(){
   async function attendanceAction(action:'check_in'|'check_out'){
     if(!secureWebMode){
       setError(
-        'تسجيل الحضور والانصراف من المتصفح غير مصرح لهذا الحساب. استخدم تطبيق Selin Team.',
+        'تسجيل الحضور والانصراف من المتصفح غير مصرح لهذا الحساب. استخدم تطبيق emora Team.',
       )
       return
     }
 
     if(iosMode&&!iosStatus?.bound){
       setError(iosStatus?.pending?
-        'طلب تفعيل جهاز الحضور ما زال بانتظار موافقة مدير المنطقة أو مدير النظام.':
+        'طلب تفعيل جهاز الحضور ما زال بانتظار موافقة مالك الشركة.':
         'يلزم تفعيل جهاز الحضور عبر المتصفح أولًا قبل تسجيل الحضور أو الانصراف.')
       return
     }
@@ -633,7 +633,7 @@ export default function PortalPage(){
                 'فعّل جهاز الحضور عبر Safari':
               webExceptionAllowed?
                 'الحضور متاح من متصفح Android المسموح':
-                'الحضور متاح من تطبيق Selin Team على Android'}</h2>
+                'الحضور متاح من تطبيق emora Team على Android'}</h2>
             <p>{todayShift?.start_time?
               `${todayShift.branch_name} • ${todayShift.start_time} - ${todayShift.end_time}`:
               data.profile.branch_name??'لم يتم تحديد الفرع'}</p>
@@ -657,7 +657,7 @@ export default function PortalPage(){
               data.open_session?<LogOut size={20}/>:<LogIn size={20}/>}
             {attendanceReady?
               data.open_session?'تسجيل الانصراف':'تسجيل الحضور':
-              'استخدم تطبيق Selin Team'}
+              'استخدم تطبيق emora Team'}
           </button>}
       </section>
 

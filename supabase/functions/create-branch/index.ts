@@ -5,21 +5,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+async function writeAuditEvent(
+  admin: ReturnType<typeof createClient>,
+  event: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const { error } = await admin.from('audit_logs').insert(event)
+    if (!error) return true
+    console.error('[audit] create-branch write failed', {
+      action: event.action,
+      company_id: event.company_id ?? null,
+      entity_id: event.entity_id ?? null,
+      code: error.code,
+    })
+  } catch (error) {
+    console.error('[audit] create-branch write threw', {
+      action: event.action,
+      company_id: event.company_id ?? null,
+      entity_id: event.entity_id ?? null,
+      error_type: error instanceof Error ? error.name : 'unknown',
+    })
+  }
+  return false
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  let admin: ReturnType<typeof createClient> | null = null
+  let auditActorUserId: string | null = null
+  let auditActorEmployeeId: string | null = null
+  let auditCompanyId: string | null = null
+  let auditRegionId: string | null = null
+  let auditBranchId: string | null = null
+  let auditWriteFailed = false
+  let createdBranch: unknown = null
 
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) throw new Error('يجب تسجيل الدخول أولًا.')
     const url = Deno.env.get('SUPABASE_URL')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+    admin = createClient(url, serviceKey, { auth: { persistSession: false } })
     const token = authHeader.replace('Bearer ', '')
     const { data: userData, error: userError } = await admin.auth.getUser(token)
     if (userError || !userData.user) throw new Error('جلسة المستخدم غير صالحة.')
+    auditActorUserId = userData.user.id
 
     const { data: employee, error: employeeError } = await admin.from('employees').select('id, company_id').eq('user_id', userData.user.id).eq('employment_status', 'active').single()
     if (employeeError || !employee) throw new Error('لا يوجد ملف موظف مرتبط بالحساب.')
+    auditActorEmployeeId = employee.id
+    auditCompanyId = employee.company_id
 
     const { data: permissionRows, error: permissionError } = await admin.from('employee_roles').select('role_permissions!inner(permissions!inner(code))').eq('employee_id', employee.id)
     if (permissionError) throw permissionError
@@ -55,7 +91,23 @@ Deno.serve(async (req) => {
       const created = await admin.from('regions').insert({ company_id: employee.company_id, name: regionName, code: regionCode }).select('id').single()
       if (created.error) throw created.error
       region = created.data
+      const regionAuditLogged = await writeAuditEvent(admin, {
+        company_id: employee.company_id,
+        actor_user_id: userData.user.id,
+        actor_employee_id: employee.id,
+        actor_company_role: null,
+        actor_platform_role: null,
+        action: 'region.created',
+        category: 'organization',
+        entity_type: 'region',
+        entity_id: region.id,
+        status: 'success',
+        new_data: { name: regionName, code: regionCode },
+        context: { source: 'create-branch' },
+      })
+      if (!regionAuditLogged) auditWriteFailed = true
     }
+    auditRegionId = region.id
 
     const { data: branch, error: branchError } = await admin.rpc('insert_branch_with_location', {
       p_company_id: employee.company_id,
@@ -69,11 +121,42 @@ Deno.serve(async (req) => {
       p_accuracy_limit: 100,
     })
     if (branchError) throw branchError
+    auditBranchId = branch.id
+    createdBranch = branch
 
-    await admin.from('audit_logs').insert({ company_id: employee.company_id, actor_user_id: userData.user.id, actor_employee_id: employee.id, action: 'branch.created', entity_type: 'branch', entity_id: branch.id, new_data: { branchName, branchCode, regionCode, latitude, longitude, radius, accuracy } })
+    const branchAuditLogged = await writeAuditEvent(admin, {
+      company_id: employee.company_id,
+      actor_user_id: userData.user.id,
+      actor_employee_id: employee.id,
+      actor_company_role: null,
+      actor_platform_role: null,
+      action: 'branch.created',
+      category: 'organization',
+      entity_type: 'branch',
+      entity_id: branch.id,
+      status: 'success',
+      new_data: { name: branchName, code: branchCode, region_id: region.id, attendance_radius_m: radius },
+      context: { source: 'create-branch' },
+    })
+    if (!branchAuditLogged) auditWriteFailed = true
 
-    return new Response(JSON.stringify({ ok: true, branch }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    return new Response(JSON.stringify({ ok: true, branch: createdBranch, auditLogged: !auditWriteFailed }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
   } catch (error) {
+    if (admin && auditActorUserId) {
+      await writeAuditEvent(admin, {
+        actor_user_id: auditActorUserId,
+        actor_employee_id: auditActorEmployeeId,
+        actor_company_role: null,
+        actor_platform_role: null,
+        company_id: auditCompanyId,
+        action: 'branch.create',
+        category: 'organization',
+        entity_type: 'branch',
+        entity_id: auditBranchId,
+        status: 'failure',
+        context: { source: 'create-branch', region_id: auditRegionId },
+      })
+    }
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'حدث خطأ غير متوقع.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
   }
 })

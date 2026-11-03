@@ -1,4 +1,4 @@
-const DB_NAME = 'selin-ios-secure'
+const DB_NAME = 'Emora-ios-secure'
 const STORE_NAME = 'device'
 const KEY_RECORD = 'device-key'
 

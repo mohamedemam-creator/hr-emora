@@ -3,73 +3,147 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+type BootstrapResult = { company_id?: string; employee_id?: string }
+
+function publicError(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  if (message.includes('already linked to a company') || message.includes('platform account')) {
+    return 'هذا الحساب مرتبط بشركة أو بإدارة المنصة بالفعل، ولا يمكنه إنشاء شركة من صفحة الإعداد.'
+  }
+  if (message.includes('invalid company') || message.includes('invalid owner') || message.includes('invalid employee')) {
+    return 'راجع اسم الشركة والأكواد وبيانات المالك المطلوبة.'
+  }
+  if (message.includes('duplicate key') || message.includes('unique constraint')) {
+    return 'كود الشركة أو الموظف مستخدم بالفعل. اختر كوداً آخر.'
+  }
+  if (message === 'جلسة المستخدم غير موجودة.' || message === 'تعذر التحقق من المستخدم.') return message
+  return 'تعذر إنشاء الشركة بأمان. حاول مرة أخرى لاحقاً أو تواصل مع الدعم.'
+}
+
+async function writeAuditEvent(
+  admin: ReturnType<typeof createClient>,
+  event: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const { error } = await admin.from('audit_logs').insert(event)
+    if (!error) return true
+    console.error('[audit] bootstrap-company write failed', {
+      action: event.action,
+      company_id: event.company_id ?? null,
+      entity_id: event.entity_id ?? null,
+      code: error.code,
+    })
+  } catch (error) {
+    console.error('[audit] bootstrap-company write threw', {
+      action: event.action,
+      company_id: event.company_id ?? null,
+      entity_id: event.entity_id ?? null,
+      error_type: error instanceof Error ? error.name : 'unknown',
+    })
+  }
+  return false
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed.' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 405,
+    })
+  }
+
+  let admin: ReturnType<typeof createClient> | null = null
+  let actorUserId: string | null = null
+  let actorEmployeeId: string | null = null
+  let companyId: string | null = null
+  let phase = 'authenticate'
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error('جلسة المستخدم غير موجودة.')
+    const authorization = req.headers.get('Authorization')
+    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
+    if (!token) throw new Error('جلسة المستخدم غير موجودة.')
 
-    const url = Deno.env.get('SUPABASE_URL')!
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
-    const token = authHeader.replace('Bearer ', '')
+    const url = Deno.env.get('SUPABASE_URL')
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!url || !serviceKey) throw new Error('server configuration unavailable')
+
+    admin = createClient(url, serviceKey, { auth: { persistSession: false } })
     const { data: userData, error: userError } = await admin.auth.getUser(token)
     if (userError || !userData.user) throw new Error('تعذر التحقق من المستخدم.')
+    actorUserId = userData.user.id
 
-    const { count, error: countError } = await admin.from('companies').select('id', { count: 'exact', head: true })
-    if (countError) throw countError
-    if ((count ?? 0) > 0) throw new Error('تم إعداد الشركة بالفعل. سجّل الدخول بحساب مدير النظام.')
-
+    phase = 'validate_input'
     const body = await req.json()
     const companyName = String(body.companyName ?? '').trim()
     const companyCode = String(body.companyCode ?? '').trim().toUpperCase()
-    const adminName = String(body.adminName ?? '').trim()
+    const ownerName = String(body.adminName ?? '').trim()
     const employeeCode = String(body.employeeCode ?? '').trim().toUpperCase()
     const phone = String(body.phone ?? '').trim()
-    if (!companyName || !companyCode || !adminName || !employeeCode) throw new Error('أكمل جميع البيانات المطلوبة.')
+    if (
+      !companyName || companyName.length > 160 ||
+      !/^[A-Z0-9_-]{2,20}$/.test(companyCode) ||
+      !ownerName || ownerName.length > 160 ||
+      !/^[A-Z0-9_-]{2,32}$/.test(employeeCode)
+    ) throw new Error('invalid company or owner input')
 
-    const { data: company, error: companyError } = await admin.from('companies').insert({ name: companyName, code: companyCode }).select().single()
-    if (companyError) throw companyError
-
-    const { data: department, error: departmentError } = await admin.from('departments').insert({ company_id: company.id, name: 'الإدارة العامة', code: 'ADMIN' }).select().single()
-    if (departmentError) throw departmentError
-
-    const { data: jobTitle, error: jobError } = await admin.from('job_titles').insert({ company_id: company.id, department_id: department.id, name: 'مدير النظام', code: 'SUPER_ADMIN' }).select().single()
-    if (jobError) throw jobError
-
-    const { error: profileError } = await admin.from('profiles').insert({ user_id: userData.user.id, full_name: adminName, phone: phone || null })
-    if (profileError) throw profileError
-
-    const { data: employee, error: employeeError } = await admin.from('employees').insert({
-      company_id: company.id,
-      user_id: userData.user.id,
-      employee_code: employeeCode,
-      full_name: adminName,
-      phone: phone || null,
-      email: userData.user.email,
-      department_id: department.id,
-      job_title_id: jobTitle.id,
-    }).select().single()
-    if (employeeError) throw employeeError
-
-    const { data: role, error: roleError } = await admin.from('roles').insert({ company_id: company.id, name: 'مدير النظام', code: 'SUPER_ADMIN', is_system: true }).select().single()
-    if (roleError) throw roleError
-
-    const { data: permissions, error: permissionsError } = await admin.from('permissions').select('id')
-    if (permissionsError) throw permissionsError
-    if (permissions?.length) {
-      const { error: rolePermissionsError } = await admin.from('role_permissions').insert(permissions.map((permission) => ({ role_id: role.id, permission_id: permission.id })))
-      if (rolePermissionsError) throw rolePermissionsError
+    phase = 'bootstrap_transaction'
+    const { data, error } = await admin.rpc('service_bootstrap_company', {
+      p_user_id: actorUserId,
+      p_company_name: companyName,
+      p_company_code: companyCode,
+      p_owner_name: ownerName,
+      p_employee_code: employeeCode,
+      p_phone: phone || null,
+    })
+    if (error) {
+      console.error('[bootstrap-company] database transaction failed', {
+        phase,
+        actor_user_id: actorUserId,
+        code: error.code,
+        hint: error.hint ? 'present' : 'absent',
+      })
+      throw new Error(error.message)
     }
 
-    const { error: employeeRoleError } = await admin.from('employee_roles').insert({ employee_id: employee.id, role_id: role.id, assigned_by: employee.id })
-    if (employeeRoleError) throw employeeRoleError
+    const result = data as BootstrapResult | null
+    if (!result?.company_id || !result.employee_id) {
+      console.error('[bootstrap-company] transaction returned an invalid result', { phase, actor_user_id: actorUserId })
+      throw new Error('invalid bootstrap result')
+    }
+    companyId = result.company_id
+    actorEmployeeId = result.employee_id
 
-    return new Response(JSON.stringify({ ok: true, companyId: company.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    return new Response(JSON.stringify({
+      ok: true,
+      companyId,
+      employeeId: actorEmployeeId,
+      // service_bootstrap_company writes this event in the same transaction
+      // as company, owner, membership, and role creation.
+      auditLogged: true,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
   } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'حدث خطأ غير متوقع.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    if (admin && actorUserId) {
+      await writeAuditEvent(admin, {
+        actor_user_id: actorUserId,
+        actor_employee_id: actorEmployeeId,
+        actor_company_role: null,
+        actor_platform_role: null,
+        company_id: companyId,
+        action: 'company.setup',
+        category: 'company',
+        entity_type: 'company',
+        entity_id: companyId,
+        status: 'failure',
+        context: { source: 'bootstrap-company', phase },
+      })
+    }
+    return new Response(JSON.stringify({ error: publicError(error) }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    })
   }
 })

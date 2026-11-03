@@ -1,0 +1,25 @@
+-- Historical review note only. This file intentionally contains no executable SQL.
+-- The login RPC and its grants are now defined by
+-- 20261101040000_login_authorization_foundation.sql.
+--
+-- Why this exists:
+-- Company setup must call edge function bootstrap-company (service role).
+-- Client-side inserts used obsolete employees.role / employees.device_id and
+-- skipped employee_roles, so app_current_access() returned null.
+--
+-- Confirmed present in the live function dump:
+--   app_current_access, app_save_employee_v2, app_list_employees_v3,
+--   app_clear_password_change_flag, app_employee_options, app_next_employee_code
+--
+-- Missing from this repository (expected on the live project):
+--   supabase/migrations/001_time_attendance_core.sql
+--   public.current_employee_id()
+--   public.current_company_id()
+--
+-- Edge Functions invoked by the app but not in this repo:
+--   manage-employee-account
+--   ios-web-attendance
+--   legacy-web-attendance
+--
+-- The former GRANT statements targeted functions absent from production and could
+-- fail before the additive definitions are created. Do not restore them here.

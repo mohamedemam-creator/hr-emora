@@ -1,6 +1,6 @@
-SELIN report date default patch
-Project: C:\Users\LD\Downloads\selin-hr-direct-deploy\selin-hr
-Backup: C:\Users\LD\Downloads\selin-hr-direct-deploy\selin-hr\.selin-backups\report-date-defaults-2026-09-04T13-50-15-808Z
+Emora report date default patch
+Project: C:\Users\LD\Downloads\Emora-hr-direct-deploy\Emora-hr
+Backup: C:\Users\LD\Downloads\Emora-hr-direct-deploy\Emora-hr\.Emora-backups\report-date-defaults-2026-09-04T13-50-15-808Z
 
 CHANGED (2):
   - app\dashboard\penalties\page.tsx

@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
 export function DashboardAccessGuard({ children }: { children: ReactNode }) {
@@ -27,20 +28,7 @@ export function DashboardAccessGuard({ children }: { children: ReactNode }) {
         router.replace('/login')
         return
       }
-      const access = data as {
-        permissions?: string[]
-        roles?: Array<{ code: string }>
-      }
-      const permissions = access.permissions ?? []
-      const roles = new Set((access.roles ?? []).map(role => role.code))
-      const hasAdminAccess =
-        permissions.some(code =>
-          !['shifts.view_own', 'attendance.view_own'].includes(code),
-        ) ||
-        roles.has('BRANCH_MANAGER') ||
-        roles.has('REGION_MANAGER') ||
-        roles.has('SUPER_ADMIN')
-      if (!hasAdminAccess) {
+      if (!hasAdminAccess(data as AppAccess)) {
         router.replace('/portal')
         return
       }
