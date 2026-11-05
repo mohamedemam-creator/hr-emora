@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, Menu } from 'lucide-react'
+import { ArrowRight, Bell, Menu } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Access = {
@@ -17,6 +17,7 @@ export function Topbar({
   onMenuToggle?: () => void
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [access, setAccess] = useState<Access>({})
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -35,6 +36,7 @@ export function Topbar({
       ['/dashboard/payroll', 'الرواتب'],
       ['/dashboard/notifications', 'التنبيهات'],
       ['/dashboard/reports', 'التقارير'],
+      ['/dashboard/profile', 'ملفي الشخصي'],
       ['/dashboard/settings', 'الإعدادات'],
       ['/portal', 'بوابتي والحضور'],
     ]
@@ -65,6 +67,12 @@ export function Topbar({
       .map(part => part[0])
       .join('')
   }, [access.full_name])
+  const isDashboardSubPage = pathname.startsWith('/dashboard/')
+
+  function goBack() {
+    if (window.history.length > 1) router.back()
+    else router.replace('/dashboard')
+  }
 
   return (
     <header className="topbar">
@@ -79,7 +87,14 @@ export function Topbar({
 
       <div className="topbar-context" aria-live="polite">
         <span>مساحة العمل</span>
-        <strong>{pageTitle}</strong>
+        <div className="topbar-title-row">
+          {isDashboardSubPage && (
+            <button type="button" className="topbar-back" onClick={goBack}>
+              رجوع <ArrowRight size={15} />
+            </button>
+          )}
+          <strong>{pageTitle}</strong>
+        </div>
       </div>
 
       <div className="topbar-actions">
@@ -98,7 +113,7 @@ export function Topbar({
           )}
         </Link>
 
-        <div className="user-chip">
+        <Link href="/dashboard/profile" className="user-chip" aria-label="فتح الملف الشخصي">
           <div className="avatar small">{initials}</div>
           <div>
             <strong>{access.full_name || 'المستخدم الحالي'}</strong>
@@ -107,7 +122,7 @@ export function Topbar({
                 'Emora HR'}
             </span>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   )

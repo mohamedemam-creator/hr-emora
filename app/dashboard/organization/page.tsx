@@ -105,7 +105,7 @@ export default function OrganizationPage() {
   if (view === 'form') {
     return (
       <main className="dashboard-content">
-        <section className="page-heading management-heading"><div><span className="eyebrow">الهيكل الوظيفي</span><h1>{form.id ? 'تعديل' : 'إضافة'} {tab === 'departments' ? 'قسم' : 'مسمى وظيفي'}</h1><p>عرّف الأقسام والمسميات واربط كل وظيفة بدور افتراضي وصلاحياته.</p></div><button className="button button-ghost" onClick={closeForm}><X size={18}/> رجوع</button></section>
+        <section className="page-heading management-heading"><div><span className="eyebrow">الهيكل الوظيفي</span><h1>{form.id ? 'تعديل' : 'إضافة'} {tab === 'departments' ? 'قسم' : 'مسمى وظيفي'}</h1><p>عرّف الأقسام والمسميات واربط كل وظيفة بدور افتراضي وصلاحياته.</p></div></section>
         <form className="panel employee-form" onSubmit={submit}>
           <div className="two-columns">
             <label>الاسم<input required value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder={tab === 'departments' ? 'مثال: المبيعات' : 'مثال: مدير فرع'} /></label>

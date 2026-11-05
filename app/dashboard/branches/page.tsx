@@ -45,6 +45,10 @@ type Branch = {
   region_id: string | null
   region_name: string | null
   region_code: string | null
+  region_manager_employee_id: string | null
+  region_manager_name: string | null
+  manager_employee_id: string | null
+  manager_name: string | null
   name: string
   code: string
   address: string | null
@@ -70,7 +74,8 @@ type BranchForm = {
   regionId: string | null
   regionName: string
   regionCode: string
-  managerId: string
+  regionManagerId: string
+  branchManagerId: string
   branchName: string
   branchCode: string
   address: string
@@ -116,7 +121,8 @@ const emptyForm: BranchForm = {
   regionId: null,
   regionName: '',
   regionCode: '',
-  managerId: '',
+  regionManagerId: '',
+  branchManagerId: '',
   branchName: '',
   branchCode: '',
   address: '',
@@ -211,7 +217,7 @@ export default function BranchesPage() {
     setError('')
     const supabase = createClient()
     const [branchesResult, regionsResult, managersResult] = await Promise.all([
-      supabase.rpc('app_list_branches'),
+      supabase.rpc('app_list_branches_with_managers'),
       supabase.rpc('app_list_regions'),
       supabase.rpc('app_list_region_manager_candidates'),
     ])
@@ -327,7 +333,8 @@ export default function BranchesPage() {
       regionId: onlyRegion?.id ?? null,
       regionName: onlyRegion?.name ?? '',
       regionCode: onlyRegion?.code ?? '',
-      managerId: onlyRegion?.manager_employee_id ?? '',
+      regionManagerId: onlyRegion?.manager_employee_id ?? '',
+      branchManagerId: '',
     })
     setCoordinates(null)
     setGoogleMapsValue('')
@@ -343,7 +350,8 @@ export default function BranchesPage() {
       regionId: branch.region_id,
       regionName: branch.region_name ?? '',
       regionCode: branch.region_code ?? '',
-      managerId: branchRegion?.manager_employee_id ?? '',
+      regionManagerId: branch.region_manager_employee_id ?? branchRegion?.manager_employee_id ?? '',
+      branchManagerId: branch.manager_employee_id ?? '',
       branchName: branch.name,
       branchCode: branch.code,
       address: branch.address ?? '',
@@ -561,8 +569,8 @@ export default function BranchesPage() {
       setError('حدد موقع الفرع من الخريطة أو استخدم موقعك الحالي.')
       return
     }
-    if (!form.regionId || !form.managerId || !form.branchName.trim() || !form.branchCode.trim()) {
-      setError('اختر المنطقة ومدير المنطقة، ثم أكمل اسم وكود الفرع.')
+    if (!form.regionId || !form.regionManagerId || !form.branchManagerId || !form.branchName.trim() || !form.branchCode.trim()) {
+      setError('اختر المنطقة ومدير المنطقة ومدير الفرع، ثم أكمل اسم وكود الفرع.')
       return
     }
 
@@ -574,10 +582,11 @@ export default function BranchesPage() {
 
     setSaving(true)
     const supabase = createClient()
-    const { error: rpcError } = await supabase.rpc('app_save_branch_with_region_manager', {
+    const { error: rpcError } = await supabase.rpc('app_save_branch_with_managers', {
       p_branch_id: form.id,
       p_region_id: form.regionId,
-      p_manager_employee_id: form.managerId,
+      p_region_manager_employee_id: form.regionManagerId,
+      p_branch_manager_employee_id: form.branchManagerId,
       p_region_name: selectedRegion.name,
       p_region_code: selectedRegion.code,
       p_branch_name: form.branchName.trim(),
@@ -726,7 +735,6 @@ export default function BranchesPage() {
             <h1>{form.id ? 'تعديل الفرع' : 'إضافة فرع جديد'}</h1>
             <p>البيانات التي تحفظ هنا تُسجّل مباشرة في Supabase.</p>
           </div>
-          <button type="button" className="button button-ghost" onClick={closeForm}><X size={18} /> رجوع للقائمة</button>
         </section>
 
         <form className="branch-layout" onSubmit={submit}>
@@ -743,7 +751,7 @@ export default function BranchesPage() {
                       regionId: event.target.value || null,
                       regionName: region?.name ?? '',
                       regionCode: region?.code ?? '',
-                      managerId: region?.manager_employee_id ?? '',
+                      regionManagerId: region?.manager_employee_id ?? '',
                     }))
                   }}
                   required
@@ -753,10 +761,10 @@ export default function BranchesPage() {
                 </select>
                 <small className="field-help">إنشاء المناطق وتعيين المدير يتم من شاشة «المناطق».</small>
               </label>
-              <label className="full-column">مدير المنطقة المسؤول عن متابعة الفرع
+              <label className="full-column">مدير المنطقة
                 <select
-                  value={form.managerId}
-                  onChange={event => setForm(current => ({ ...current, managerId: event.target.value }))}
+                  value={form.regionManagerId}
+                  onChange={event => setForm(current => ({ ...current, regionManagerId: event.target.value }))}
                   required
                 >
                   <option value="">اختر مدير المنطقة</option>
@@ -787,9 +795,20 @@ export default function BranchesPage() {
                     )
                   })()}
                 </select>
-                <small className="field-help">
-                  المدير المختار يصبح مديرًا للمنطقة كلها، فيرى جميع فروعها وموظفيها فقط، ولا يرى فروع المناطق الأخرى.
-                </small>
+                <small className="field-help">يُحفظ مدير المنطقة على المنطقة كلها، ويشرف على فروعها ضمن نطاقه.</small>
+              </label>
+              <label className="full-column">مدير الفرع
+                <select
+                  value={form.branchManagerId}
+                  onChange={event => setForm(current => ({ ...current, branchManagerId: event.target.value }))}
+                  required
+                >
+                  <option value="">اختر مدير الفرع</option>
+                  {managers.map(manager => <option value={manager.id} key={manager.id}>
+                    {manager.full_name} — {manager.employee_code}{manager.job_title_name ? ` — ${manager.job_title_name}` : ''}
+                  </option>)}
+                </select>
+                <small className="field-help">يُحفظ هذا التعيين على الفرع نفسه.</small>
               </label>
               <label>اسم الفرع<input value={form.branchName} onChange={event => setForm(current => ({ ...current, branchName: event.target.value }))} required /></label>
               <label>كود الفرع<input value={form.branchCode} onChange={event => setForm(current => ({ ...current, branchCode: event.target.value.toUpperCase() }))} required /></label>

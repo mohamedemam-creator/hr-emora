@@ -133,7 +133,6 @@ export default function RegionsPage() {
       <main className="dashboard-content">
         <section className="page-heading management-heading">
           <div><span className="eyebrow">إدارة المناطق</span><h1>{form.id ? 'تعديل المنطقة' : 'إضافة منطقة'}</h1><p>المنطقة تجمع عددًا من الفروع ويشاهد مديرها فروعه وموظفيه فقط.</p></div>
-          <button className="button button-ghost" type="button" onClick={() => setView('list')}><X size={18}/> رجوع</button>
         </section>
 
         <form className="panel employee-form" onSubmit={submit}>

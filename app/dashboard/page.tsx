@@ -5,10 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowUpLeft,
   Building2,
-  CalendarClock,
   Clock3,
   Loader2,
-  MapPinned,
   Plus,
   Search,
   UserCheck,
@@ -147,6 +145,7 @@ export default function DashboardPage() {
       detail: 'الموظفون النشطون فعليًا',
       icon: UsersRound,
       action: false,
+      href: '/dashboard/employees',
     },
     {
       label: 'الحاضرون اليوم',
@@ -156,6 +155,7 @@ export default function DashboardPage() {
         : 'لا توجد بيانات حضور',
       icon: UserCheck,
       action: false,
+      href: '/dashboard/attendance',
     },
     {
       label: 'المتأخرون اليوم',
@@ -170,6 +170,7 @@ export default function DashboardPage() {
       detail: `${summary.regions} منطقة نشطة`,
       icon: Building2,
       action: false,
+      href: '/dashboard/branches',
     },
   ], [summary])
 
@@ -228,7 +229,7 @@ export default function DashboardPage() {
       )}
 
       <section className="stats-grid">
-        {stats.map(({ label, value, detail, icon: Icon, action }) =>
+        {stats.map(({ label, value, detail, icon: Icon, action, href }) =>
           action ? (
             <button
               type="button"
@@ -247,6 +248,23 @@ export default function DashboardPage() {
                 عرض التفاصيل <ArrowUpLeft size={13} />
               </span>
             </button>
+          ) : href ? (
+            <Link
+              href={href}
+              className="stat-card stat-card-clickable"
+              key={label}
+              aria-label={`فتح صفحة ${label}`}
+            >
+              <div className="stat-icon"><Icon size={22} /></div>
+              <span>{label}</span>
+              <strong>
+                {loading ? <Loader2 className="spin" size={24} /> : value}
+              </strong>
+              <small>{detail}</small>
+              <span className="stat-card-open-hint">
+                عرض التفاصيل <ArrowUpLeft size={13} />
+              </span>
+            </Link>
           ) : (
             <article className="stat-card" key={label}>
               <div className="stat-icon"><Icon size={22} /></div>
@@ -260,7 +278,7 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <section className="dashboard-grid">
+      <section className="dashboard-grid dashboard-grid-single">
         <article className="panel chart-panel">
           <div className="panel-heading">
             <div>
@@ -317,41 +335,6 @@ export default function DashboardPage() {
           )}
         </article>
 
-        <article className="panel quick-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>إجراءات سريعة</h2>
-              <p>إدارة البيانات الحقيقية</p>
-            </div>
-          </div>
-
-          <Link href="/dashboard/branches">
-            <MapPinned />
-            <div>
-              <strong>الفروع والمناطق</strong>
-              <span>إضافة وتعديل وحذف واستيراد Excel</span>
-            </div>
-            <ArrowUpLeft />
-          </Link>
-
-          <Link href="/dashboard/employees">
-            <UsersRound />
-            <div>
-              <strong>الموظفون</strong>
-              <span>إضافة أو استيراد ملف الموظفين</span>
-            </div>
-            <ArrowUpLeft />
-          </Link>
-
-          <Link href="/dashboard/organization">
-            <CalendarClock />
-            <div>
-              <strong>الهيكل الوظيفي</strong>
-              <span>الأقسام والمسميات والأدوار الافتراضية</span>
-            </div>
-            <ArrowUpLeft />
-          </Link>
-        </article>
       </section>
 
       {lateOpen && (

@@ -212,7 +212,9 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-mobile-heading">
-        <Logo light />
+        <Link href="/dashboard" className="sidebar-logo-link" aria-label="Emora HR — الرئيسية">
+          <Logo light />
+        </Link>
         <button
           type="button"
           className="sidebar-close"
@@ -224,7 +226,9 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-desktop-logo">
-        <Logo light />
+        <Link href="/dashboard" className="sidebar-logo-link" aria-label="Emora HR — الرئيسية">
+          <Logo light />
+        </Link>
       </div>
 
       <nav aria-label="التنقل الرئيسي">

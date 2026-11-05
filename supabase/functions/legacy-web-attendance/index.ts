@@ -35,10 +35,32 @@ Deno.serve(async req => {
 
     const body = await req.json()
     const action = String(body.action ?? '')
-    const { data: access, error: accessError } = await supabase.rpc('app_my_web_attendance_access')
-    if (accessError || !access?.allowed) return json({ error: 'Web attendance is not enabled for this employee.' }, 403)
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.slice(0, 160) : ''
+    const { data: access, error: accessError } = deviceId
+      ? await supabase.rpc('app_my_web_attendance_access_for_device', { p_device_id: deviceId })
+      : await supabase.rpc('app_my_web_attendance_access')
+    const requestHost = new URL(url).hostname.toLowerCase()
+    const isLocalSupabase = ['localhost', '127.0.0.1', '::1', '[::1]', 'kong', 'host.docker.internal'].includes(requestHost)
+    const demoMode = Deno.env.get('DEMO_MODE') === 'true' && isLocalSupabase
+    if ((accessError || !access?.allowed) && !demoMode) {
+      if (action === 'attendance' && deviceId) {
+        const { data: request, error: requestError } = await supabase.rpc(
+          'app_request_my_mobile_device',
+          { p_device_id: deviceId },
+        )
+        if (!requestError) {
+          return json({
+            error: request?.status === 'revoked'
+              ? 'هذا الجهاز ملغي التفعيل. تواصل مع مسؤول الشركة لإعادة إتاحته.'
+              : 'تم تسجيل طلب تفعيل هذا الجهاز. يلزم موافقة مسؤول الشركة قبل الحضور.',
+            deviceStatus: request?.status ?? 'released',
+          }, 403)
+        }
+      }
+      return json({ error: 'Web attendance is not enabled for this employee.' }, 403)
+    }
 
-    if (action === 'status') return json({ ok: true, allowed: true })
+    if (action === 'status') return json({ ok: true, allowed: true, demoMode })
 
     if (action === 'position') {
       const { data, error } = await supabase.rpc('app_report_attendance_position', {
@@ -56,7 +78,7 @@ Deno.serve(async req => {
         p_latitude: Number(body.latitude),
         p_longitude: Number(body.longitude),
         p_accuracy_m: Number(body.accuracy),
-        p_device_id: 'web_exception',
+        p_device_id: deviceId || 'web_exception',
       })
       if (error) return json({ error: error.message }, 400)
       return json(data as Record<string, unknown>)

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { CheckCircle2, KeyRound, Loader2, Power, Smartphone, X } from 'lucide-react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import { activateEmployeeMobileDevice, resetEmployeePassword } from '@/app/dashboard/employees/actions'
 
 type IosWebDeviceStatus = {
   has_device:boolean
@@ -25,7 +26,7 @@ type WebAttendanceExceptionStatus = {
 
 type MobileDeviceStatus = {
   has_device:boolean
-  status:'none'|'active'|'blocked'|'released'
+  status:'none'|'active'|'revoked'|'released'
   device_id?:string
   device_id_short?:string
   model?:string|null
@@ -36,6 +37,7 @@ type MobileDeviceStatus = {
   block_reason?:string|null
   can_reset?:boolean
   can_release?:boolean
+  can_activate?:boolean
 }
 
 type EmployeeAccount = {
@@ -187,6 +189,18 @@ export function EmployeeAccountPanel({
     setLoading(false)
   }
 
+  async function activateDevice() {
+    if (!device?.device_id) return
+    setLoading(true); setError(''); setSuccess('')
+    const result = await activateEmployeeMobileDevice(employee.id, device.device_id)
+    if (!result.ok) setError(result.message)
+    else {
+      setSuccess(result.message)
+      await loadDevice()
+    }
+    setLoading(false)
+  }
+
   async function invoke(action: string) {
     setLoading(true)
     setError('')
@@ -226,9 +240,29 @@ export function EmployeeAccountPanel({
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
-    void invoke(employee.has_login ? 'reset-password' : 'invite')
+    if (!employee.has_login) {
+      void invoke('invite')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    try {
+      const result = await resetEmployeePassword(employee.id, password)
+      if (!result.ok) throw new Error(result.message)
+      setSuccess(result.auditLogged === false
+        ? `${result.message} تعذر حفظ سجل التدقيق؛ لا تكرر العملية.`
+        : result.message)
+      setPassword('')
+      await onUpdated()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'تعذر إعادة تعيين كلمة المرور.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -248,7 +282,7 @@ export function EmployeeAccountPanel({
               readOnly
             />
           </label>
-          {employee.has_login && <label>كلمة مرور مؤقتة جديدة<input type="password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>}
+          {employee.has_login && <label>كلمة مرور مؤقتة جديدة<input type="password" required minLength={8} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>}
           {employee.has_login && <div className="form-note">سيُطلب من الموظف تغيير كلمة المرور عند أول دخول.</div>}
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
@@ -266,7 +300,7 @@ export function EmployeeAccountPanel({
             <Smartphone size={20}/>
             <div>
               <strong>جهاز Emora Team</strong>
-              <span>{device?.status==='active'?'مرتبط ومفعل':device?.status==='blocked'?'الجهاز السابق محظور':device?.status==='released'?'تم السماح بإعادة استخدام الجهاز':'لم يتم تفعيل جهاز'}</span>
+              <span>{device?.status==='active'?'مرتبط ومفعل':device?.status==='revoked'?'الجهاز ملغي التفعيل':device?.status==='released'?'طلب التفعيل بانتظار المراجعة':'لم يتم تفعيل جهاز'}</span>
             </div>
           </div>
           {device?.has_device && <>
@@ -276,8 +310,11 @@ export function EmployeeAccountPanel({
           {device?.status==='active' && device.can_reset && <button type="button" className="button button-danger-soft button-full" disabled={loading} onClick={()=>void resetDevice()}>
             <Smartphone size={18}/> فك ربط الجهاز والسماح بهاتف جديد
           </button>}
-          {device?.status==='blocked' && device.can_release && <button type="button" className="button button-ghost button-full" disabled={loading} onClick={()=>void releaseDevice()}>
+          {device?.status==='revoked' && device.can_release && <button type="button" className="button button-ghost button-full" disabled={loading} onClick={()=>void releaseDevice()}>
             <Smartphone size={18}/> السماح بإعادة استخدام الهاتف المحظور
+          </button>}
+          {device?.status==='released' && device.can_activate && <button type="button" className="button button-primary button-full" disabled={loading} onClick={()=>void activateDevice()}>
+            {loading?<Loader2 className="spin" size={18}/>:<CheckCircle2 size={18}/>} تفعيل الجهاز
           </button>}
         </div>
 

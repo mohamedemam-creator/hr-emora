@@ -45,6 +45,11 @@ type LeaveBalance = {
   leave_type_id:string; name:string; entitlement:number;
   used:number; remaining:number;
 }
+type LeavePolicyBalance={
+  annual_limit:number|null;annual_used:number;annual_pending:number;annual_remaining:number|null;
+  monthly_limit:number|null;monthly_used:number;monthly_pending:number;monthly_remaining:number|null;
+  sick_limit:number|null;sick_used:number;sick_pending:number;sick_remaining:number|null;
+}
 type LeaveRequest = {
   id:string; leave_type_name:string; starts_on:string; ends_on:string;
   requested_days:number; reason:string|null; status:string;
@@ -113,6 +118,15 @@ function fridayOf(date=new Date()){
   v.setDate(v.getDate()-daysSinceFriday)
   return v.toISOString().slice(0,10)
 }
+function isLocalDemoEnabled(){
+  if(process.env.NEXT_PUBLIC_DEMO_MODE!=='true')return false
+  try{
+    const hostname=new URL(process.env.NEXT_PUBLIC_SUPABASE_URL??'').hostname.toLowerCase()
+    return ['localhost','127.0.0.1','::1','[::1]','kong','host.docker.internal'].includes(hostname)
+  }catch{
+    return false
+  }
+}
 type IosWebStatus = {
   bound:boolean
   pending:boolean
@@ -120,8 +134,10 @@ type IosWebStatus = {
   deviceCode?:string
   message?:string
 }
+type MobileDeviceState = { has_device:boolean; status:'none'|'active'|'released'|'revoked'; device_id_short?:string }
 
 export default function PortalPage(){
+  const demoMode=isLocalDemoEnabled()
   const [data,setData]=useState<PortalData|null>(null)
   const [loading,setLoading]=useState(true)
   const [working,setWorking]=useState(false)
@@ -133,6 +149,8 @@ export default function PortalPage(){
   const [iosMode,setIosMode]=useState(false)
   const [webExceptionAllowed,setWebExceptionAllowed]=useState(false)
   const [iosStatus,setIosStatus]=useState<IosWebStatus|null>(null)
+  const [mobileDevice,setMobileDevice]=useState<MobileDeviceState|null>(null)
+  const [leavePolicyBalance,setLeavePolicyBalance]=useState<LeavePolicyBalance|null>(null)
   const [leaveOpen,setLeaveOpen]=useState(false)
   const [leaveForm,setLeaveForm]=useState({
     leaveTypeId:'',startsOn:'',endsOn:'',reason:'',
@@ -217,14 +235,22 @@ export default function PortalPage(){
   }
 
   async function refreshIosStatus() {
+    if(demoMode){
+      setIosMode(false)
+      setWebExceptionAllowed(true)
+      setIosStatus(null)
+      return
+    }
+
     const ios=isIosBrowser()
     setIosMode(ios)
 
     if(!ios){
       const supabase=createClient()
-      const {data:access,error:accessError}=await supabase.rpc(
-        'app_my_web_attendance_access',
-      )
+      let deviceId=window.localStorage.getItem('emora.mobile-device-fingerprint')
+      const {data:access,error:accessError}=deviceId
+        ? await supabase.rpc('app_my_web_attendance_access_for_device',{p_device_id:deviceId})
+        : await supabase.rpc('app_my_web_attendance_access')
 
       if(accessError){
         setWebExceptionAllowed(false)
@@ -239,7 +265,7 @@ export default function PortalPage(){
       if(!exceptionAllowed)return
 
       try{
-        await invokeLegacyWeb({action:'status'})
+        await invokeLegacyWeb({action:'status',deviceId:deviceId??'web_exception'})
       }catch(caught){
         setError(
           caught instanceof Error
@@ -287,31 +313,7 @@ export default function PortalPage(){
   }
 
   async function requestIosActivation() {
-    setWorking(true);setError('');setSuccess('')
-    try{
-      const key=await ensureIosWebKey(webExceptionAllowed)
-      const result=await invokeIosWeb({
-        action:'request_binding',
-        browserId:key.browserId,
-        publicKeySpki:key.publicKeySpki,
-        userAgent:navigator.userAgent,
-      })
-      setIosStatus({
-        bound:Boolean(result?.bound),
-        pending:Boolean(result?.pending ?? !result?.bound),
-        requestCode:result?.requestCode,
-        deviceCode:result?.deviceCode,
-      })
-      if(result?.bound){
-        setSuccess('هذا المتصفح مفعل بالفعل للحضور لهذا الحساب.')
-      }else{
-        setSuccess(
-          `تم إرسال طلب تفعيل جهاز الحضور${result?.requestCode?` — كود الطلب ${result.requestCode}`:''}. بانتظار موافقة مالك الشركة.`,
-        )
-      }
-    }catch(caught){
-      setError(caught instanceof Error?caught.message:'تعذر إرسال طلب تفعيل جهاز الحضور.')
-    }finally{setWorking(false)}
+    await requestMobileDeviceActivation()
   }
 
   async function signIosRequest(
@@ -334,6 +336,58 @@ export default function PortalPage(){
     if(rpcError)setError(rpcError.message)
     else setData(result as PortalData)
     setLoading(false)
+  }
+  async function loadMobileDevice(){
+    const supabase=createClient()
+    const {data,error:statusError}=await supabase.rpc('app_my_mobile_device_status')
+    if(!statusError)setMobileDevice(data as MobileDeviceState)
+  }
+  async function loadLeavePolicyBalance(){
+    const supabase=createClient()
+    const {data,error:balanceError}=await supabase.rpc('app_my_leave_policy_balance')
+    if(!balanceError)setLeavePolicyBalance(data as LeavePolicyBalance)
+  }
+  async function requestMobileDeviceActivation(){
+    setWorking(true);setError('');setSuccess('')
+    try{
+      let fingerprint:string
+      if(isIosBrowser()){
+        const key=await ensureIosWebKey(webExceptionAllowed)
+        const binding=await invokeIosWeb({
+          action:'request_binding',browserId:key.browserId,
+          publicKeySpki:key.publicKeySpki,userAgent:navigator.userAgent,
+        })
+        fingerprint=`ios:${key.browserId}`
+        setIosStatus({
+          bound:Boolean(binding?.bound),pending:Boolean(binding?.pending??!binding?.bound),
+          requestCode:binding?.requestCode,deviceCode:binding?.deviceCode,
+        })
+      }else{
+        const storageKey='emora.mobile-device-fingerprint'
+        let stored=window.localStorage.getItem(storageKey)
+        if(!stored){
+          stored=`web:${window.crypto.randomUUID()}`
+          window.localStorage.setItem(storageKey,stored)
+        }
+        fingerprint=stored
+      }
+      const supabase=createClient()
+      const {data,error:requestError}=await supabase.rpc('app_request_my_mobile_device',{
+        p_device_id:fingerprint,
+      })
+      if(requestError)throw requestError
+      const next=data as {status?:MobileDeviceState['status']}
+      setMobileDevice({has_device:true,status:next.status??'released',device_id_short:fingerprint.slice(-8)})
+      await loadMobileDevice()
+      if(!isIosBrowser())await refreshIosStatus()
+      setSuccess(next.status==='active'
+        ?'هذا الجهاز مفعّل بالفعل.'
+        :next.status==='revoked'
+          ?'هذا الجهاز ملغي التفعيل. تواصل مع مسؤول الشركة لإعادة إتاحته.'
+          :'تم إرسال طلب تفعيل الجهاز إلى مسؤول الشركة.')
+    }catch(caught){
+      setError(caught instanceof Error?caught.message:'تعذر إرسال طلب تفعيل الجهاز.')
+    }finally{setWorking(false)}
   }
   async function loadHourPermissions(){
     setPermissionError('')
@@ -360,11 +414,21 @@ export default function PortalPage(){
   useEffect(()=>{void load()},[weekStart])
   useEffect(()=>{void loadHourPermissions()},[])
   useEffect(()=>{void refreshIosStatus()},[])
+  useEffect(()=>{void loadMobileDevice()},[])
+  useEffect(()=>{void loadLeavePolicyBalance()},[])
   useEffect(()=>{
     if(!iosStatus?.pending)return
     const timer=window.setInterval(()=>void refreshIosStatus(),15000)
     return()=>window.clearInterval(timer)
   },[iosStatus?.pending])
+  useEffect(()=>{
+    if(mobileDevice?.status!=='released')return
+    const timer=window.setInterval(()=>{
+      void loadMobileDevice()
+      if(!isIosBrowser())void refreshIosStatus()
+    },15000)
+    return()=>window.clearInterval(timer)
+  },[mobileDevice?.status])
 
   useEffect(()=>{
     if(!data?.open_session||!navigator.geolocation){
@@ -394,6 +458,7 @@ export default function PortalPage(){
               }))
           : invokeLegacyWeb({
               action:'position',
+              deviceId:window.localStorage.getItem('emora.mobile-device-fingerprint')??'web_exception',
               ...positionBody,
             })
 
@@ -426,15 +491,24 @@ export default function PortalPage(){
   function readLocation(){
     return new Promise<GeolocationPosition>((resolve,reject)=>{
       if(!navigator.geolocation){
-        reject(new Error('الهاتف أو المتصفح لا يدعم تحديد الموقع.'));return
+        reject(new Error('هذا المتصفح لا يدعم تحديد الموقع. استخدم جهازًا يدعم GPS لتسجيل الحضور.'));return
       }
-      navigator.geolocation.getCurrentPosition(resolve,reject,{
+      navigator.geolocation.getCurrentPosition(resolve,positionError=>{
+        if(positionError.code===1){
+          reject(new Error('تم رفض الوصول إلى الموقع. اسمح للمتصفح باستخدام موقعك من إعدادات الموقع ثم حاول مرة أخرى.'))
+        }else if(positionError.code===2){
+          reject(new Error('تعذر تحديد موقعك الحالي. فعّل GPS وتأكد من اتصال الجهاز ثم حاول مجددًا.'))
+        }else{
+          reject(new Error('استغرق تحديد الموقع وقتًا طويلًا. تأكد من تفعيل GPS وحاول مرة أخرى.'))
+        }
+      },{
         enableHighAccuracy:true,timeout:25000,maximumAge:0,
       })
     })
   }
   async function attendanceAction(action:'check_in'|'check_out'){
     if(!secureWebMode){
+      if(!iosMode){await requestMobileDeviceActivation();return}
       setError(
         'تسجيل الحضور والانصراف من المتصفح غير مصرح لهذا الحساب. استخدم تطبيق emora Team.',
       )
@@ -442,14 +516,12 @@ export default function PortalPage(){
     }
 
     if(iosMode&&!iosStatus?.bound){
-      setError(iosStatus?.pending?
-        'طلب تفعيل جهاز الحضور ما زال بانتظار موافقة مالك الشركة.':
-        'يلزم تفعيل جهاز الحضور عبر المتصفح أولًا قبل تسجيل الحضور أو الانصراف.')
+      await requestMobileDeviceActivation()
       return
     }
 
     if(!iosMode&&!webExceptionAllowed){
-      setError('الحضور من المتصفح غير مفعل لهذا الحساب.')
+      await requestMobileDeviceActivation()
       return
     }
 
@@ -472,6 +544,7 @@ export default function PortalPage(){
         result=await invokeLegacyWeb({
           action:'attendance',
           attendanceAction:action,
+          deviceId:window.localStorage.getItem('emora.mobile-device-fingerprint')??'web_exception',
           latitude:position.coords.latitude,
           longitude:position.coords.longitude,
           accuracy:position.coords.accuracy,
@@ -632,7 +705,7 @@ export default function PortalPage(){
                 iosStatus?.pending?'بانتظار اعتماد جهاز الحضور':
                 'فعّل جهاز الحضور عبر Safari':
               webExceptionAllowed?
-                'الحضور متاح من متصفح Android المسموح':
+                demoMode?'وضع العرض — الحضور متاح من هذا المتصفح':'الحضور متاح من متصفح Android المسموح':
                 'الحضور متاح من تطبيق emora Team على Android'}</h2>
             <p>{todayShift?.start_time?
               `${todayShift.branch_name} • ${todayShift.start_time} - ${todayShift.end_time}`:
@@ -661,6 +734,24 @@ export default function PortalPage(){
           </button>}
       </section>
 
+      <section className="employee-device-box portal-device-activation">
+        <div className="employee-device-heading">
+          <Smartphone size={20}/>
+          <div><strong>تفعيل هذا الجهاز</strong>
+            <span>{mobileDevice?.status==='active'?'الجهاز مفعّل':
+              mobileDevice?.status==='released'?'طلب التفعيل بانتظار موافقة مسؤول الشركة':
+              mobileDevice?.status==='revoked'?'الجهاز ملغي التفعيل':'لم يتم تسجيل هذا الجهاز'}</span>
+          </div>
+        </div>
+        {mobileDevice?.device_id_short&&<small>معرّف الجهاز: {mobileDevice.device_id_short}</small>}
+        {mobileDevice?.status!=='active'&&<button type="button" className="button button-ghost button-full"
+          disabled={working||mobileDevice?.status==='revoked'} onClick={()=>void requestMobileDeviceActivation()}>
+          {working?<Loader2 className="spin" size={18}/>:<Smartphone size={18}/>}
+          {mobileDevice?.status==='released'?'تحديث طلب تفعيل الجهاز':'طلب تفعيل هذا الجهاز'}
+        </button>}
+        <small>بعد التفعيل يبقى تحقق GPS ودقة الموقع ونطاق الفرع إلزاميًا لكل حضور.</small>
+      </section>
+
       <section className="portal-stats">
         <article><CalendarDays/><span>شيفت اليوم</span>
           <strong>{todayShift?dayTypeLabels[todayShift.day_type]:'غير منشور'}</strong>
@@ -677,14 +768,18 @@ export default function PortalPage(){
         </article>
       </section>
 
-      {data.leave_balances.length>0&&<section className="portal-balance-grid">
-        {data.leave_balances.map(balance=><article key={balance.leave_type_id}>
-          <FileText/><div><span>{balance.name}</span>
-            <strong>{balance.remaining} يوم متبقي</strong>
-            <small>المستخدم {balance.used} من {balance.entitlement}</small>
-          </div>
-        </article>)}
-      </section>}
+      {leavePolicyBalance&&[leavePolicyBalance.annual_limit,leavePolicyBalance.monthly_limit,leavePolicyBalance.sick_limit].some(value=>value!==null)&&
+        <section className="portal-balance-grid">
+          {leavePolicyBalance.annual_limit!==null&&<article><FileText/><div><span>الإجازات السنوية</span>
+            <strong>{leavePolicyBalance.annual_remaining} يوم متبقي من {leavePolicyBalance.annual_limit}</strong>
+            <small>المستخدم {leavePolicyBalance.annual_used} — قيد المراجعة {leavePolicyBalance.annual_pending}</small></div></article>}
+          {leavePolicyBalance.monthly_limit!==null&&<article><FileText/><div><span>الإجازات الشهرية</span>
+            <strong>{leavePolicyBalance.monthly_remaining} يوم متبقي من {leavePolicyBalance.monthly_limit}</strong>
+            <small>المستخدم {leavePolicyBalance.monthly_used} — قيد المراجعة {leavePolicyBalance.monthly_pending}</small></div></article>}
+          {leavePolicyBalance.sick_limit!==null&&<article><FileText/><div><span>الإجازات المرضية</span>
+            <strong>{leavePolicyBalance.sick_remaining} يوم متبقي من {leavePolicyBalance.sick_limit}</strong>
+            <small>المستخدم {leavePolicyBalance.sick_used} — قيد المراجعة {leavePolicyBalance.sick_pending}</small></div></article>}
+        </section>}
 
       {hourBalance&&<section className="portal-balance-grid">
         <article><Clock3/><div>

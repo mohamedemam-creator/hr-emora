@@ -11,7 +11,7 @@ begin
  select emp.branch_id,b.region_id into branch_value,region_value from public.employees emp left join public.branches b on b.id=emp.branch_id and b.company_id=c where emp.id=e and emp.company_id=c;
  if branch_value is null or region_value is null then raise exception 'leave approval requires an assigned branch and region' using errcode='23514'; end if;
  if p_starts_on is null or p_ends_on is null or p_ends_on<p_starts_on then raise exception 'invalid leave dates' using errcode='22023'; end if;
- select * into leave_type from public.leave_types where id=p_leave_type_id and company_id=c and is_active;
+ select leave_types.* into leave_type from public.leave_types as leave_types where leave_types.id=p_leave_type_id and leave_types.company_id=c and leave_types.is_active;
  if not found then raise exception 'leave type is unavailable' using errcode='22023'; end if;
  if leave_type.requires_attachment then raise exception 'this leave type requires an attachment, but the portal does not yet support attachment uploads' using errcode='0A000'; end if;
  perform 1 from public.employees where id=e and company_id=c for update;
@@ -43,10 +43,10 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); r public.leave_requests;
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- select * into r from public.leave_requests where id=p_request_id and company_id=c and employee_id=e and status='pending' for update;
+ select leave_request.* into r from public.leave_requests as leave_request where leave_request.id=p_request_id and leave_request.company_id=c and leave_request.employee_id=e and leave_request.status='pending' for update;
  if not found then raise exception 'pending leave request not found' using errcode='P0002'; end if;
- update public.leave_requests set status='cancelled',updated_at=clock_timestamp() where id=r.id and company_id=c;
- update public.request_approval_workflows set status='cancelled',current_stage='completed',final_status='cancelled',updated_at=clock_timestamp(),completed_at=clock_timestamp() where company_id=c and request_type='leave' and request_id=r.id and status='pending';
+ update public.leave_requests as leave_request set status='cancelled',updated_at=clock_timestamp() where leave_request.id=r.id and leave_request.company_id=c;
+ update public.request_approval_workflows as approval_workflow set status='cancelled',current_stage='completed',final_status='cancelled',updated_at=clock_timestamp(),completed_at=clock_timestamp() where approval_workflow.company_id=c and approval_workflow.request_type='leave' and approval_workflow.request_id=r.id and approval_workflow.status='pending';
  perform app_private.audit_company_action(c,'leave.cancelled','leave_request',r.id,to_jsonb(r),jsonb_build_object('status','cancelled'));
 end; $$;
 revoke all on function public.app_cancel_leave_request(uuid) from public,anon;
@@ -98,7 +98,7 @@ declare c uuid:=public.current_company_id(); reviewer_id uuid:=public.current_em
 begin
  if auth.uid() is null or c is null or reviewer_id is null then raise exception 'active company employee required' using errcode='42501'; end if;
  if p_decision is null or p_decision not in ('approved','rejected') then raise exception 'invalid decision' using errcode='22023'; end if;
- select * into r from public.leave_requests where id=p_request_id and company_id=c and status='pending' for update;
+ select leave_request.* into r from public.leave_requests as leave_request where leave_request.id=p_request_id and leave_request.company_id=c and leave_request.status='pending' for update;
  if not found then raise exception 'pending leave request not found' using errcode='P0002'; end if;
  if reviewer_id=r.employee_id then raise exception 'cannot review your own leave request' using errcode='42501'; end if;
  select * into w from public.request_approval_workflows where company_id=c and request_type='leave' and request_id=r.id for update;
@@ -107,21 +107,21 @@ begin
  if w.current_stage='region' and w.branch_reviewed_by=reviewer_id then raise exception 'the branch reviewer cannot perform the final region review' using errcode='42501'; end if;
  if stage_role is null or not public.has_permission('leaves.approve',w.branch_id,w.region_id,stage_role) then raise exception 'reviewer is not assigned to the current approval scope' using errcode='42501'; end if;
  if w.current_stage='branch' then
-  update public.request_approval_workflows set branch_decision=p_decision,branch_reviewed_at=clock_timestamp(),branch_note=nullif(btrim(p_notes),''),branch_reviewed_by=reviewer_id,
+  update public.request_approval_workflows as approval_workflow set branch_decision=p_decision,branch_reviewed_at=clock_timestamp(),branch_note=nullif(btrim(p_notes),''),branch_reviewed_by=reviewer_id,
    current_stage=case when p_decision='approved' then 'region' else 'completed' end,current_stage_order=case when p_decision='approved' then 2 else current_stage_order end,
    status=case when p_decision='approved' then 'pending' else 'rejected' end,final_status=case when p_decision='rejected' then 'rejected' else null end,
    completed_at=case when p_decision='rejected' then clock_timestamp() else null end,updated_at=clock_timestamp()
-  where id=w.id and company_id=c;
+  where approval_workflow.id=w.id and approval_workflow.company_id=c;
   if p_decision='rejected' then
-   update public.leave_requests set status='rejected',reviewed_by=reviewer_id,reviewer_notes=nullif(btrim(p_notes),''),updated_at=clock_timestamp() where id=r.id and company_id=c;
+   update public.leave_requests as leave_request set status='rejected',reviewed_by=reviewer_id,reviewer_notes=nullif(btrim(p_notes),''),updated_at=clock_timestamp() where leave_request.id=r.id and leave_request.company_id=c;
   else
    next_stage:='region';
   end if;
  else
-  update public.request_approval_workflows set region_decision=p_decision,region_reviewed_at=clock_timestamp(),region_note=nullif(btrim(p_notes),''),region_reviewed_by=reviewer_id,
+  update public.request_approval_workflows as approval_workflow set region_decision=p_decision,region_reviewed_at=clock_timestamp(),region_note=nullif(btrim(p_notes),''),region_reviewed_by=reviewer_id,
    current_stage='completed',current_stage_order=2,status=p_decision,final_status=p_decision,completed_at=clock_timestamp(),updated_at=clock_timestamp()
-  where id=w.id and company_id=c;
-  update public.leave_requests set status=p_decision,reviewed_by=reviewer_id,reviewer_notes=nullif(btrim(p_notes),''),updated_at=clock_timestamp() where id=r.id and company_id=c;
+  where approval_workflow.id=w.id and approval_workflow.company_id=c;
+  update public.leave_requests as leave_request set status=p_decision,reviewed_by=reviewer_id,reviewer_notes=nullif(btrim(p_notes),''),updated_at=clock_timestamp() where leave_request.id=r.id and leave_request.company_id=c;
  end if;
  if next_stage='region' then
   insert into public.notifications(company_id,recipient_employee_id,user_id,notification_type,title,body,entity_type,entity_id)
@@ -154,7 +154,8 @@ begin
  select emp.branch_id,b.region_id into branch_value,region_value from public.employees emp left join public.branches b on b.id=emp.branch_id and b.company_id=c where emp.id=e and emp.company_id=c;
  if branch_value is null or region_value is null then raise exception 'hour permission approval requires an assigned branch and region' using errcode='23514'; end if;
  if p_permission_date is null or p_permission_type not in ('late_arrival','early_leave') or p_requested_minutes not in (60,120,240) then raise exception 'invalid hour permission request' using errcode='22023'; end if;
- select coalesce(timezone,'Africa/Cairo') into tz from public.companies where id=c;
+ select coalesce(companies.timezone,'Africa/Cairo') into tz
+  from public.companies as companies where companies.id=c;
  today_value:=(clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date;
  if date_trunc('month',p_permission_date)::date<>date_trunc('month',today_value)::date then raise exception 'hour permission date must be in the current month' using errcode='22023'; end if;
  if not exists(select 1 from public.shift_assignments sa where sa.company_id=c and sa.employee_id=e and sa.shift_date=p_permission_date and sa.status='published' and sa.day_type='work') then
@@ -187,10 +188,10 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); r public.employee_hour_permissions;
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- select * into r from public.employee_hour_permissions where id=p_permission_id and company_id=c and employee_id=e and status='pending' for update;
+ select hourly_permission.* into r from public.employee_hour_permissions as hourly_permission where hourly_permission.id=p_permission_id and hourly_permission.company_id=c and hourly_permission.employee_id=e and hourly_permission.status='pending' for update;
  if not found then raise exception 'pending hour permission request not found' using errcode='P0002'; end if;
- update public.employee_hour_permissions set status='cancelled',updated_at=clock_timestamp() where id=r.id and company_id=c;
- update public.request_approval_workflows set status='cancelled',current_stage='completed',final_status='cancelled',updated_at=clock_timestamp(),completed_at=clock_timestamp() where company_id=c and request_type='hour_permission' and request_id=r.id and status='pending';
+ update public.employee_hour_permissions as hourly_permission set status='cancelled',updated_at=clock_timestamp() where hourly_permission.id=r.id and hourly_permission.company_id=c;
+ update public.request_approval_workflows as approval_workflow set status='cancelled',current_stage='completed',final_status='cancelled',updated_at=clock_timestamp(),completed_at=clock_timestamp() where approval_workflow.company_id=c and approval_workflow.request_type='hour_permission' and approval_workflow.request_id=r.id and approval_workflow.status='pending';
  perform app_private.audit_company_action(c,'hour_permission.cancelled','hour_permission',r.id,to_jsonb(r),jsonb_build_object('status','cancelled'));
  return jsonb_build_object('ok',true,'message','تم إلغاء طلب الإذن.');
 end; $$;
@@ -203,7 +204,8 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); month_value date; approved_value integer; pending_value integer; tz text;
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- select coalesce(timezone,'Africa/Cairo') into tz from public.companies where id=c;
+ select coalesce(companies.timezone,'Africa/Cairo') into tz
+  from public.companies as companies where companies.id=c;
  month_value:=coalesce(date_trunc('month',p_month)::date,date_trunc('month',clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date);
  select coalesce(sum(requested_minutes) filter(where status='approved'),0)::integer,coalesce(sum(requested_minutes) filter(where status='pending'),0)::integer into approved_value,pending_value
  from public.employee_hour_permissions where company_id=c and employee_id=e and date_trunc('month',permission_date)=month_value;
@@ -219,10 +221,16 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); tz text; month_value date;
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- select coalesce(timezone,'Africa/Cairo') into tz from public.companies where id=c;
+ select coalesce(companies.timezone,'Africa/Cairo') into tz
+  from public.companies as companies where companies.id=c;
  month_value:=coalesce(date_trunc('month',p_month)::date,date_trunc('month',clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date);
- return query select h.id,h.permission_date,h.permission_type,h.requested_minutes,h.reason,h.status,h.review_note,h.reviewed_at,h.created_at
-  from public.employee_hour_permissions h where h.company_id=c and h.employee_id=e and date_trunc('month',h.permission_date)=month_value order by h.permission_date desc,h.created_at desc;
+ return query select hourly_permissions.id,hourly_permissions.permission_date,hourly_permissions.permission_type,
+  hourly_permissions.requested_minutes,hourly_permissions.reason,hourly_permissions.status,
+  hourly_permissions.review_note,hourly_permissions.reviewed_at,hourly_permissions.created_at
+  from public.employee_hour_permissions as hourly_permissions
+  where hourly_permissions.company_id=c and hourly_permissions.employee_id=e
+   and date_trunc('month',hourly_permissions.permission_date)=month_value
+  order by hourly_permissions.permission_date desc,hourly_permissions.created_at desc;
 end; $$;
 revoke all on function public.app_list_my_hour_permissions(date) from public,anon;
 grant execute on function public.app_list_my_hour_permissions(date) to authenticated;
@@ -234,24 +242,25 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); can_view_all boolean:=public.has_permission('hour_permissions.approve'); m date; tz text;
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- select coalesce(timezone,'Africa/Cairo') into tz from public.companies where id=c;
+ select coalesce(companies.timezone,'Africa/Cairo') into tz
+  from public.companies as companies where companies.id=c;
  m:=coalesce(date_trunc('month',p_month)::date,date_trunc('month',clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date);
- return query select h.id,emp.id,emp.employee_code,emp.full_name,b.name,h.permission_date,h.permission_type,h.requested_minutes,h.reason,h.status,reviewer.full_name,h.review_note,h.reviewed_at,h.created_at,
-  coalesce(w.current_stage,'completed'),h.status='pending' and (
+ return query select hourly_permissions.id,emp.id,emp.employee_code,emp.full_name,b.name,hourly_permissions.permission_date,hourly_permissions.permission_type,hourly_permissions.requested_minutes,hourly_permissions.reason,hourly_permissions.status,reviewer.full_name,hourly_permissions.review_note,hourly_permissions.reviewed_at,hourly_permissions.created_at,
+  coalesce(w.current_stage,'completed'),hourly_permissions.status='pending' and (
    (w.current_stage='branch' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'BRANCH_MANAGER'))
    or (w.current_stage='region' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'AREA_MANAGER'))
   ),branch_reviewer.full_name,region_reviewer.full_name
- from public.employee_hour_permissions h join public.employees emp on emp.id=h.employee_id and emp.company_id=c
- left join public.request_approval_workflows w on w.company_id=c and w.request_type='hour_permission' and w.request_id=h.id
+ from public.employee_hour_permissions as hourly_permissions join public.employees emp on emp.id=hourly_permissions.employee_id and emp.company_id=c
+ left join public.request_approval_workflows w on w.company_id=c and w.request_type='hour_permission' and w.request_id=hourly_permissions.id
  left join public.branches b on b.id=emp.branch_id and b.company_id=c
- left join public.employees reviewer on reviewer.id=h.reviewed_by_employee_id and reviewer.company_id=c
+ left join public.employees reviewer on reviewer.id=hourly_permissions.reviewed_by_employee_id and reviewer.company_id=c
  left join public.employees branch_reviewer on branch_reviewer.id=w.branch_reviewed_by and branch_reviewer.company_id=c
  left join public.employees region_reviewer on region_reviewer.id=w.region_reviewed_by and region_reviewer.company_id=c
- where h.company_id=c and date_trunc('month',h.permission_date)=m and (can_view_all or h.employee_id=e or h.status='pending' and (
+ where hourly_permissions.company_id=c and date_trunc('month',hourly_permissions.permission_date)=m and (can_view_all or hourly_permissions.employee_id=e or hourly_permissions.status='pending' and (
   (w.current_stage='branch' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'BRANCH_MANAGER'))
   or (w.current_stage='region' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'AREA_MANAGER'))
- )) and (p_status is null or h.status=p_status)
- order by h.permission_date desc,h.created_at desc;
+ )) and (p_status is null or hourly_permissions.status=p_status)
+ order by hourly_permissions.permission_date desc,hourly_permissions.created_at desc;
 end; $$;
 revoke all on function public.app_list_hour_permissions(text,date) from public,anon;
 grant execute on function public.app_list_hour_permissions(text,date) to authenticated;
@@ -267,7 +276,7 @@ as $$
 declare c uuid:=public.current_company_id(); reviewer_id uuid:=public.current_employee_id(); r public.employee_hour_permissions; w public.request_approval_workflows; decision_value text:=case when p_approve then 'approved' else 'rejected' end; stage_role text; next_stage text;
 begin
  if auth.uid() is null or c is null or reviewer_id is null then raise exception 'active company employee required' using errcode='42501'; end if;
- select * into r from public.employee_hour_permissions where id=p_permission_id and company_id=c and status='pending' for update;
+ select hourly_permission.* into r from public.employee_hour_permissions as hourly_permission where hourly_permission.id=p_permission_id and hourly_permission.company_id=c and hourly_permission.status='pending' for update;
  if not found then raise exception 'pending hour permission request not found' using errcode='P0002'; end if;
  if reviewer_id=r.employee_id then raise exception 'cannot review your own hour permission request' using errcode='42501'; end if;
  select * into w from public.request_approval_workflows where company_id=c and request_type='hour_permission' and request_id=r.id for update;
@@ -276,21 +285,21 @@ begin
  if w.current_stage='region' and w.branch_reviewed_by=reviewer_id then raise exception 'the branch reviewer cannot perform the final region review' using errcode='42501'; end if;
  if stage_role is null or not public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,stage_role) then raise exception 'reviewer is not assigned to the current approval scope' using errcode='42501'; end if;
  if w.current_stage='branch' then
-  update public.request_approval_workflows set branch_decision=decision_value,branch_reviewed_at=clock_timestamp(),branch_note=nullif(btrim(p_note),''),branch_reviewed_by=reviewer_id,
+  update public.request_approval_workflows as approval_workflow set branch_decision=decision_value,branch_reviewed_at=clock_timestamp(),branch_note=nullif(btrim(p_note),''),branch_reviewed_by=reviewer_id,
    current_stage=case when p_approve then 'region' else 'completed' end,current_stage_order=case when p_approve then 2 else current_stage_order end,
    status=case when p_approve then 'pending' else 'rejected' end,final_status=case when p_approve then null else 'rejected' end,
    completed_at=case when p_approve then null else clock_timestamp() end,updated_at=clock_timestamp()
-  where id=w.id and company_id=c;
+  where approval_workflow.id=w.id and approval_workflow.company_id=c;
   if p_approve then
    next_stage:='region';
   else
-   update public.employee_hour_permissions set status='rejected',review_note=nullif(btrim(p_note),''),reviewed_by_employee_id=reviewer_id,reviewed_at=clock_timestamp(),updated_at=clock_timestamp() where id=r.id and company_id=c;
+   update public.employee_hour_permissions as hourly_permission set status='rejected',review_note=nullif(btrim(p_note),''),reviewed_by_employee_id=reviewer_id,reviewed_at=clock_timestamp(),updated_at=clock_timestamp() where hourly_permission.id=r.id and hourly_permission.company_id=c;
   end if;
  else
-  update public.request_approval_workflows set region_decision=decision_value,region_reviewed_at=clock_timestamp(),region_note=nullif(btrim(p_note),''),region_reviewed_by=reviewer_id,
+  update public.request_approval_workflows as approval_workflow set region_decision=decision_value,region_reviewed_at=clock_timestamp(),region_note=nullif(btrim(p_note),''),region_reviewed_by=reviewer_id,
    current_stage='completed',current_stage_order=2,status=decision_value,final_status=decision_value,completed_at=clock_timestamp(),updated_at=clock_timestamp()
-  where id=w.id and company_id=c;
-  update public.employee_hour_permissions set status=decision_value,review_note=nullif(btrim(p_note),''),reviewed_by_employee_id=reviewer_id,reviewed_at=clock_timestamp(),updated_at=clock_timestamp() where id=r.id and company_id=c;
+  where approval_workflow.id=w.id and approval_workflow.company_id=c;
+  update public.employee_hour_permissions as hourly_permission set status=decision_value,review_note=nullif(btrim(p_note),''),reviewed_by_employee_id=reviewer_id,reviewed_at=clock_timestamp(),updated_at=clock_timestamp() where hourly_permission.id=r.id and hourly_permission.company_id=c;
  end if;
  if next_stage='region' then
   insert into public.notifications(company_id,recipient_employee_id,user_id,notification_type,title,body,entity_type,entity_id)

@@ -118,7 +118,7 @@ export default function RolesPage() {
   if (view === 'form') {
     return (
       <main className="dashboard-content">
-        <section className="page-heading management-heading"><div><span className="eyebrow">الأمان</span><h1>{form.id ? 'تعديل الدور' : 'إضافة دور وصلاحيات'}</h1><p>حدد بدقة ما الذي يستطيع مستخدم هذا الدور مشاهدته أو تعديله.</p></div><button className="button button-ghost" onClick={closeForm}><X size={18}/> رجوع</button></section>
+        <section className="page-heading management-heading"><div><span className="eyebrow">الأمان</span><h1>{form.id ? 'تعديل الدور' : 'إضافة دور وصلاحيات'}</h1><p>حدد بدقة ما الذي يستطيع مستخدم هذا الدور مشاهدته أو تعديله.</p></div></section>
         <form className="panel role-form" onSubmit={submit}>
           <div className="two-columns">
             <label>اسم الدور<input required value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="مثال: محاسب" /></label>
