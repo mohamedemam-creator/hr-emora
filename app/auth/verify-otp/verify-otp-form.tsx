@@ -122,6 +122,7 @@ export function VerifyOtpForm() {
     }
 
     verificationInFlight.current = true
+    const verificationStartedAt = performance.now()
     setLoading(true)
     setVerificationState('verifying')
     setError('')
@@ -149,6 +150,10 @@ export function VerifyOtpForm() {
       }
 
       await bootstrapNewCompany(setupPayload)
+      const animationRemainder = Math.max(0, 880 - (performance.now() - verificationStartedAt))
+      if (animationRemainder > 0) {
+        await new Promise(resolve => window.setTimeout(resolve, animationRemainder))
+      }
       setVerificationState('success')
       setMessage('تم تأكيد البريد وإنشاء الشركة. جارٍ فتح لوحة التحكم…')
       await new Promise(resolve => window.setTimeout(resolve, 1000))
@@ -175,19 +180,34 @@ export function VerifyOtpForm() {
   }
 
   async function resendCode() {
-    if (!email) return
+    if (!email || resending || loading) return
     setResending(true)
     setError('')
     setMessage('')
     try {
       const supabase = createClient()
-      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: new URL(
+            '/auth/callback?next=%2Fsetup',
+            process.env.NEXT_PUBLIC_APP_URL || window.location.origin,
+          ).toString(),
+        },
+      })
       if (resendError) throw resendError
       setDigits(Array.from({ length: 8 }, () => ''))
+      setVerificationState('idle')
       inputs.current[0]?.focus()
       setMessage('أُرسل رمز جديد. استخدم أحدث رمز وصلك إلى بريدك الإلكتروني.')
     } catch (caught) {
-      setError(formatAppError(caught, 'تعذر إرسال رمز جديد. حاول مرة أخرى بعد قليل.'))
+      const detail = formatAppError(caught, '').toLowerCase()
+      setError(
+        detail.includes('rate limit') || detail.includes('too many requests')
+          ? 'تم طلب رموز كثيرة خلال وقت قصير. انتظر قليلاً ثم أعد المحاولة.'
+          : formatAppError(caught, 'تعذر إرسال رمز جديد. تحقق من الاتصال وحاول مرة أخرى.'),
+      )
     } finally {
       setResending(false)
     }
@@ -217,10 +237,10 @@ export function VerifyOtpForm() {
         <p className="otp-description">أرسلنا رمزًا مكوّنًا من 8 أرقام إلى بريدك الإلكتروني.</p>
         {email && <p className="otp-email" dir="ltr"><bdi>{email}</bdi></p>}
 
-        <form className="otp-form" onSubmit={verify}>
-          <fieldset ref={fieldset} className="otp-fieldset" disabled={loading || resending}>
+        <form className="otp-form" onSubmit={verify} aria-busy={loading}>
+          <fieldset ref={fieldset} className="otp-fieldset" disabled={loading || resending || !email}>
             <legend>رمز التحقق</legend>
-            <div className="otp-inputs" dir="ltr" aria-label="رمز التحقق المكوّن من 8 أرقام">
+            <div className={`otp-inputs${verificationState === 'verifying' ? ' is-verifying' : ''}`} dir="ltr" aria-label="رمز التحقق المكوّن من 8 أرقام">
               {digits.map((digit, index) => (
                 <input
                   key={index}

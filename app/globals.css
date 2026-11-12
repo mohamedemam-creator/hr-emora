@@ -1865,13 +1865,15 @@ body{background:var(--background);color:var(--ink)}
 .otp-inputs{gap:clamp(4px,1.4vw,8px)}
 .otp-inputs input{position:relative;width:100%;height:clamp(46px,13vw,56px);padding:0 2px;border:1px solid rgba(203,213,225,.23);border-radius:12px;background:linear-gradient(155deg,rgba(255,255,255,.075),rgba(15,23,42,.66) 62%);box-shadow:inset 0 1px rgba(255,255,255,.09),0 5px 14px rgba(2,8,23,.13);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);color:#F8FAFC;text-align:center;font-size:clamp(15px,4.8vw,21px);font-weight:750;font-variant-numeric:tabular-nums;outline:none;transition:border-color .16s ease,background-color .16s ease,box-shadow .16s ease,transform .18s cubic-bezier(.2,.8,.2,1)}
 .otp-inputs input.is-filled{border-color:rgba(103,232,249,.52);background:linear-gradient(155deg,rgba(34,211,238,.14),rgba(101,85,217,.13))}
+.otp-inputs.is-verifying input.is-filled{border-color:rgba(34,211,238,.82);background:linear-gradient(155deg,rgba(34,211,238,.18),rgba(101,85,217,.16));box-shadow:inset 0 1px rgba(255,255,255,.11),0 0 12px rgba(34,211,238,.13)}
 .otp-inputs input:focus{z-index:1;border-color:#67E8F9;background:linear-gradient(155deg,rgba(34,211,238,.15),rgba(30,27,75,.9));box-shadow:0 0 0 1px rgba(101,85,217,.95),0 0 0 4px rgba(34,211,238,.2),0 0 20px rgba(101,85,217,.22);transform:translateY(-1px) scale(1.035)}
 .otp-form .form-error{border-color:rgba(248,113,113,.38);background:rgba(127,29,29,.28);color:#FECACA}
 .otp-form .form-success{border-color:rgba(52,211,153,.36);background:rgba(6,95,70,.26);color:#A7F3D0;animation:otp-success-in .28s cubic-bezier(.2,.8,.2,1) both}
-.otp-icon-verifying{border-color:rgba(34,211,238,.62);background:rgba(34,211,238,.1);color:#67E8F9;box-shadow:0 0 0 4px rgba(34,211,238,.08),0 0 22px rgba(34,211,238,.22)}
 .otp-icon{transition:border-color .24s ease,background-color .24s ease,color .24s ease,box-shadow .24s ease}
 .otp-icon-verifying{border-color:rgba(34,211,238,.62);background:rgba(34,211,238,.1);color:#67E8F9;box-shadow:0 0 0 4px rgba(34,211,238,.08),0 0 22px rgba(34,211,238,.22)}
-.otp-progress-ring{width:29px;height:29px;overflow:visible;animation:otp-ring-cycle .88s linear infinite;transform-box:fill-box;transform-origin:center}
+.otp-icon{width:62px;height:62px;margin-bottom:18px;border-radius:19px}
+.otp-icon-verifying{border-color:rgba(34,211,238,.72);background:rgba(34,211,238,.1);color:#67E8F9;box-shadow:0 0 0 5px rgba(34,211,238,.08),0 0 28px rgba(34,211,238,.26)}
+.otp-progress-ring{width:38px;height:38px;overflow:visible;animation:otp-ring-cycle .82s cubic-bezier(.45,.05,.55,.95) infinite;transform-box:fill-box;transform-origin:center}
 .otp-ring-track,.otp-ring-progress{fill:none;stroke-width:2.5}
 .otp-ring-track{stroke:rgba(148,163,184,.28)}
 .otp-ring-progress{stroke:currentColor;stroke-linecap:round;stroke-dasharray:31 70.5}
@@ -1918,7 +1920,8 @@ body{background:var(--background);color:var(--ink)}
   .otp-brand .brand-subtitle{margin-top:3px;font-size:6.5px;letter-spacing:.35px}
   .otp-header>.onboarding-stepper{flex:0 0 clamp(112px,36vw,138px);width:clamp(112px,36vw,138px);min-width:112px}
   .otp-card{padding:clamp(18px,5vw,24px);border-radius:18px}
-  .otp-icon{width:48px;height:48px;margin-bottom:14px}
+  .otp-icon{width:54px;height:54px;margin-bottom:14px;border-radius:17px}
+  .otp-progress-ring{width:33px;height:33px}
   .otp-email{margin-bottom:22px}
   .otp-inputs{gap:clamp(4px,1.25vw,6px)}
   .otp-inputs input{height:clamp(44px,13vw,50px);border-radius:10px;font-size:clamp(15px,4.8vw,18px)}
