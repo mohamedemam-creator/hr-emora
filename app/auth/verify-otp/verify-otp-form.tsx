@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, CheckCircle2, LoaderCircle, Mail } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { OnboardingProgress } from '@/components/onboarding-progress'
-import { bootstrapNewCompany, type CompanySetupPayload } from '@/lib/company-bootstrap'
+import {
+  bootstrapNewCompany,
+  hasCompletedCompanyBootstrap,
+  resumeCompletedCompanySetup,
+  type CompanySetupPayload,
+} from '@/lib/company-bootstrap'
 import {
   applySignupOtpInput,
   getSignupOtpBackspaceTarget,
@@ -45,6 +50,32 @@ export function VerifyOtpForm() {
 
     const resolvedEmail = pendingEmail || setupEmail
     setEmail(resolvedEmail)
+
+    if (hasCompletedCompanyBootstrap()) {
+      verificationInFlight.current = true
+      setLoading(true)
+      setVerificationState('verifying')
+      setMessage('تم إنشاء الشركة. جارٍ استعادة صلاحيات الدخول…')
+      void resumeCompletedCompanySetup()
+        .then(() => {
+          setVerificationState('success')
+          setMessage('تم إعداد الشركة بنجاح. جارٍ فتح لوحة التحكم…')
+          window.setTimeout(() => {
+            router.replace('/dashboard')
+            router.refresh()
+          }, 1000)
+        })
+        .catch(caught => {
+          window.sessionStorage.setItem(
+            'emora_setup_recovery_error',
+            formatAppError(caught, 'تعذر استعادة صلاحيات الشركة. أعد المحاولة دون طلب رمز جديد.'),
+          )
+          router.replace('/setup?edit=1')
+        })
+        .finally(() => setLoading(false))
+      return
+    }
+
     if (resolvedEmail) {
       window.localStorage.setItem('emora_pending_verification_email', resolvedEmail)
       inputs.current[0]?.focus()
@@ -127,6 +158,7 @@ export function VerifyOtpForm() {
     setVerificationState('verifying')
     setError('')
     setMessage('')
+    let emailVerified = false
     try {
       const pendingSetup = window.localStorage.getItem('emora_pending_setup')
       if (!pendingSetup) throw new Error('بيانات إعداد الشركة غير موجودة. ابدأ التسجيل من جديد.')
@@ -149,6 +181,7 @@ export function VerifyOtpForm() {
         throw new Error('تعذر تأكيد الحساب المسجل. تحقق من البريد المستخدم ثم حاول مرة أخرى.')
       }
 
+      emailVerified = true
       await bootstrapNewCompany(setupPayload)
       const animationRemainder = Math.max(0, 880 - (performance.now() - verificationStartedAt))
       if (animationRemainder > 0) {
@@ -161,13 +194,19 @@ export function VerifyOtpForm() {
       router.refresh()
     } catch (caught) {
       verificationInFlight.current = false
+      const errorMessage = formatAppError(caught, 'تعذر إنشاء الشركة. راجع بيانات الشركة وحاول مرة أخرى.')
+      if (emailVerified && window.localStorage.getItem('emora_pending_setup')) {
+        window.sessionStorage.setItem('emora_setup_recovery_error', errorMessage)
+        router.push('/setup?edit=1')
+        return
+      }
       setVerificationState('idle')
       shakeInputs()
       const detail = formatAppError(caught, '').toLowerCase()
       setError(
         detail.includes('expired') || detail.includes('invalid') || detail.includes('otp_expired')
           ? 'الرمز غير صالح أو انتهت صلاحيته. أرسل رمزًا جديدًا ثم أدخل أحدث رمز وصلك.'
-          : formatAppError(caught, 'تعذر تأكيد البريد. راجع الرمز وحاول مرة أخرى.'),
+          : errorMessage,
       )
     } finally {
       setLoading(false)

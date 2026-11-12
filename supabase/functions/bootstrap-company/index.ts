@@ -8,6 +8,13 @@ const corsHeaders = {
 }
 
 type BootstrapResult = { company_id?: string; employee_id?: string }
+type BootstrapInput = {
+  companyName: string
+  companyCode: string
+  ownerName: string
+  employeeCode: string
+  email: string
+}
 
 function publicError(error: unknown) {
   const message = error instanceof Error ? error.message : ''
@@ -17,8 +24,17 @@ function publicError(error: unknown) {
   if (message.includes('invalid company') || message.includes('invalid owner') || message.includes('invalid employee')) {
     return 'راجع اسم الشركة والأكواد وبيانات المالك المطلوبة.'
   }
-  if (message.includes('duplicate key') || message.includes('unique constraint')) {
-    return 'كود الشركة أو الموظف مستخدم بالفعل. اختر كوداً آخر.'
+  const errorCode = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code ?? '')
+    : ''
+  const constraint = message.match(/unique constraint\s+"([^"]+)"/i)?.[1] ?? ''
+  if (errorCode === '23505' || constraint) {
+    if (constraint === 'companies_code_key') return 'كود الشركة مستخدم بالفعل. اختر كوداً آخر.'
+    if (constraint === 'employees_company_id_employee_code_key' || constraint === 'employees_company_code_ci_uidx') {
+      return 'كود الموظف مستخدم بالفعل داخل الشركة. اختر كوداً آخر.'
+    }
+    if (constraint === 'employees_company_email_ci_uidx') return 'يوجد موظف مسجل بهذا البريد داخل الشركة.'
+    return 'تعذر إكمال التسجيل بسبب تعارض في بيانات فريدة. راجع الأكواد والبريد أو تواصل مع الدعم.'
   }
   if (message === 'جلسة المستخدم غير موجودة.' || message === 'تعذر التحقق من المستخدم.') return message
   return 'تعذر إنشاء الشركة بأمان. حاول مرة أخرى لاحقاً أو تواصل مع الدعم.'
@@ -46,6 +62,73 @@ async function writeAuditEvent(
     })
   }
   return false
+}
+
+async function findExistingBootstrap(
+  admin: ReturnType<typeof createClient>,
+  actorUserId: string,
+  input: BootstrapInput,
+): Promise<BootstrapResult | null> {
+  const { data: memberships, error: membershipError } = await admin
+    .from('company_memberships')
+    .select('company_id, employee_id')
+    .eq('user_id', actorUserId)
+    .eq('status', 'active')
+    .limit(2)
+  if (membershipError) throw membershipError
+  if (!memberships?.length) return null
+  if (memberships.length !== 1 || !memberships[0].employee_id) {
+    throw new Error('user is already linked to a company')
+  }
+
+  const membership = memberships[0]
+  const [{ data: company, error: companyError }, { data: employee, error: employeeError }] = await Promise.all([
+    admin.from('companies').select('id, name, code').eq('id', membership.company_id).maybeSingle(),
+    admin.from('employees').select('id, company_id, user_id, employee_code, full_name, email')
+      .eq('id', membership.employee_id).eq('company_id', membership.company_id)
+      .eq('user_id', actorUserId).maybeSingle(),
+  ])
+  if (companyError) throw companyError
+  if (employeeError) throw employeeError
+  if (!company || !employee) throw new Error('user is already linked to a company')
+
+  const { data: ownerRole, error: ownerRoleError } = await admin.from('roles')
+    .select('id').eq('company_id', company.id).eq('code', 'COMPANY_OWNER').maybeSingle()
+  if (ownerRoleError) throw ownerRoleError
+  if (!ownerRole) throw new Error('user is already linked to a company')
+
+  const { data: ownerAssignment, error: assignmentError } = await admin.from('employee_roles')
+    .select('employee_id').eq('employee_id', employee.id).eq('role_id', ownerRole.id).maybeSingle()
+  if (assignmentError) throw assignmentError
+
+  const { data: auditEvent, error: auditError } = await admin.from('audit_logs')
+    .select('id').eq('company_id', company.id).eq('entity_id', company.id)
+    .eq('action', 'company.created').eq('status', 'success').limit(1).maybeSingle()
+  if (auditError) throw auditError
+
+  const sameSignup =
+    Boolean(ownerAssignment) &&
+    Boolean(auditEvent) &&
+    String(company.code).toUpperCase() === input.companyCode.toUpperCase() &&
+    String(company.name).trim().toLowerCase() === input.companyName.trim().toLowerCase() &&
+    String(employee.employee_code).toUpperCase() === input.employeeCode.toUpperCase() &&
+    String(employee.full_name).trim().toLowerCase() === input.ownerName.trim().toLowerCase() &&
+    String(employee.email ?? '').trim().toLowerCase() === input.email.trim().toLowerCase()
+  if (!sameSignup) throw new Error('user is already linked to a company')
+
+  return { company_id: company.id, employee_id: employee.id }
+}
+
+function successResponse(
+  result: BootstrapResult,
+  headers: Record<string, string>,
+): Response {
+  return new Response(JSON.stringify({
+    ok: true,
+    companyId: result.company_id,
+    employeeId: result.employee_id,
+    auditLogged: true,
+  }), { headers: { ...headers, 'Content-Type': 'application/json' }, status: 200 })
 }
 
 Deno.serve(async (req) => {
@@ -84,12 +167,27 @@ Deno.serve(async (req) => {
     const ownerName = String(body.adminName ?? '').trim()
     const employeeCode = String(body.employeeCode ?? '').trim().toUpperCase()
     const phone = getBootstrapPhone(body)
+    const email = String(userData.user.email ?? '').trim().toLowerCase()
     if (
       !companyName || companyName.length > 160 ||
       !/^[A-Z0-9_-]{2,20}$/.test(companyCode) ||
       !ownerName || ownerName.length > 160 ||
       !/^[A-Z0-9_-]{2,32}$/.test(employeeCode)
     ) throw new Error('invalid company or owner input')
+
+    phase = 'idempotent_recovery'
+    const existingBootstrap = await findExistingBootstrap(admin, actorUserId, {
+      companyName,
+      companyCode,
+      ownerName,
+      employeeCode,
+      email,
+    })
+    if (existingBootstrap) {
+      companyId = existingBootstrap.company_id ?? null
+      actorEmployeeId = existingBootstrap.employee_id ?? null
+      return successResponse(existingBootstrap, corsHeaders)
+    }
 
     phase = 'bootstrap_transaction'
     const { data, error } = await admin.rpc('service_bootstrap_company', {
@@ -101,12 +199,35 @@ Deno.serve(async (req) => {
       p_phone: phone,
     })
     if (error) {
+      const constraint = error.message.match(/unique constraint\s+"([^"]+)"/i)?.[1] ?? null
       console.error('[bootstrap-company] database transaction failed', {
         phase,
         actor_user_id: actorUserId,
         code: error.code,
+        constraint,
         hint: error.hint ? 'present' : 'absent',
       })
+
+      try {
+        const recoveredBootstrap = await findExistingBootstrap(admin, actorUserId, {
+          companyName,
+          companyCode,
+          ownerName,
+          employeeCode,
+          email,
+        })
+        if (recoveredBootstrap) {
+          companyId = recoveredBootstrap.company_id ?? null
+          actorEmployeeId = recoveredBootstrap.employee_id ?? null
+          return successResponse(recoveredBootstrap, corsHeaders)
+        }
+      } catch (recoveryError) {
+        console.error('[bootstrap-company] idempotent recovery failed', {
+          actor_user_id: actorUserId,
+          error_type: recoveryError instanceof Error ? recoveryError.name : 'unknown',
+        })
+      }
+
       throw new Error(error.message)
     }
 
@@ -118,14 +239,7 @@ Deno.serve(async (req) => {
     companyId = result.company_id
     actorEmployeeId = result.employee_id
 
-    return new Response(JSON.stringify({
-      ok: true,
-      companyId,
-      employeeId: actorEmployeeId,
-      // service_bootstrap_company writes this event in the same transaction
-      // as company, owner, membership, and role creation.
-      auditLogged: true,
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    return successResponse(result, corsHeaders)
   } catch (error) {
     if (admin && actorUserId) {
       await writeAuditEvent(admin, {
