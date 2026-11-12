@@ -7,6 +7,7 @@ import { ArrowRight, Check, CheckCircle2, LoaderCircle, Mail } from 'lucide-reac
 import { Logo } from '@/components/logo'
 import { OnboardingProgress } from '@/components/onboarding-progress'
 import { Skeleton } from '@/components/skeleton'
+import { bootstrapNewCompany, type CompanySetupPayload } from '@/lib/company-bootstrap'
 import {
   applySignupOtpInput,
   getSignupOtpBackspaceTarget,
@@ -26,6 +27,7 @@ export function VerifyOtpForm() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const inputs = useRef<Array<HTMLInputElement | null>>([])
+  const verificationInFlight = useRef(false)
   const code = digits.join('')
 
   useEffect(() => {
@@ -54,7 +56,12 @@ export function VerifyOtpForm() {
   function updateDigit(position: number, value: string) {
     const result = applySignupOtpInput(digits, value, position)
     setDigits(result.digits)
+    setError('')
     inputs.current[result.focusIndex]?.focus()
+    const nextCode = result.digits.join('')
+    if (email && isSignupOtpValid(nextCode) && !resending) {
+      void verifyCode(nextCode)
+    }
   }
 
   function handleKeyDown(position: number, event: KeyboardEvent<HTMLInputElement>) {
@@ -80,13 +87,14 @@ export function VerifyOtpForm() {
     updateDigit(position, pasted)
   }
 
-  async function verify(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!email || !isSignupOtpValid(code)) {
+  async function verifyCode(submittedCode: string) {
+    if (verificationInFlight.current) return
+    if (!email || !isSignupOtpValid(submittedCode)) {
       setError('أدخل رمز التحقق المكوّن من 8 أرقام.')
       return
     }
 
+    verificationInFlight.current = true
     setLoading(true)
     setVerificationState('verifying')
     setError('')
@@ -94,7 +102,8 @@ export function VerifyOtpForm() {
     try {
       const pendingSetup = window.localStorage.getItem('emora_pending_setup')
       if (!pendingSetup) throw new Error('بيانات إعداد الشركة غير موجودة. ابدأ التسجيل من جديد.')
-      const setupEmail = String(JSON.parse(pendingSetup).email ?? '').trim().toLowerCase()
+      const setupPayload = JSON.parse(pendingSetup) as CompanySetupPayload
+      const setupEmail = String(setupPayload.email ?? '').trim().toLowerCase()
       if (setupEmail !== email.trim().toLowerCase()) {
         throw new Error('البريد لا يطابق بيانات التسجيل. ابدأ التسجيل بالبريد نفسه.')
       }
@@ -102,7 +111,7 @@ export function VerifyOtpForm() {
       const supabase = createClient()
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
-        token: code,
+        token: submittedCode,
         type: 'email',
       })
       if (verifyError) throw verifyError
@@ -112,12 +121,14 @@ export function VerifyOtpForm() {
         throw new Error('تعذر تأكيد الحساب المسجل. تحقق من البريد المستخدم ثم حاول مرة أخرى.')
       }
 
+      await bootstrapNewCompany(setupPayload)
       setVerificationState('success')
-      setMessage('تم تأكيد البريد. جارٍ تجهيز مساحة الشركة…')
-      await new Promise(resolve => window.setTimeout(resolve, 650))
-      router.replace('/setup?verified=1')
+      setMessage('تم تأكيد البريد وإنشاء الشركة. جارٍ فتح لوحة التحكم…')
+      await new Promise(resolve => window.setTimeout(resolve, 1000))
+      router.push('/dashboard')
       router.refresh()
     } catch (caught) {
+      verificationInFlight.current = false
       setVerificationState('idle')
       const detail = formatAppError(caught, '').toLowerCase()
       setError(
@@ -128,6 +139,11 @@ export function VerifyOtpForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function verify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void verifyCode(code)
   }
 
   async function resendCode() {

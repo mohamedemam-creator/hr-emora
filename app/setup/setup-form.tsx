@@ -3,21 +3,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
-import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { Logo } from '@/components/logo'
 import { OnboardingProgress } from '@/components/onboarding-progress'
 import { waitForAuthSession } from '@/lib/auth-confirmation'
-import { formatAppError, hasAdminAccess, type AppAccess } from '@/lib/app-access'
+import { bootstrapNewCompany, type CompanySetupPayload } from '@/lib/company-bootstrap'
+import { formatAppError } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
-
-type SetupPayload = {
-  companyName: string
-  companyCode: string
-  adminName: string
-  employeeCode: string
-  phone: string
-  email: string
-}
 
 export function SetupForm() {
   const router = useRouter()
@@ -67,7 +58,7 @@ export function SetupForm() {
 
         if (!pendingData) return
 
-        const payload: SetupPayload = JSON.parse(pendingData)
+        const payload: CompanySetupPayload = JSON.parse(pendingData)
         const sessionEmail = session.user.email?.trim().toLowerCase()
         if (!sessionEmail || sessionEmail !== payload.email.trim().toLowerCase()) {
           setError('تم تأكيد حساب مختلف عن البريد المستخدم لإعداد الشركة. سجّل الدخول بالبريد نفسه لإكمال الإعداد.')
@@ -93,55 +84,9 @@ export function SetupForm() {
     }
   }, [hasAuthCallbackError, router])
 
-  async function bootstrapCompany(payload: SetupPayload) {
-    const supabase = createClient()
-    const { data, error: functionError } = await supabase.functions.invoke('bootstrap-company', {
-      body: {
-        companyName: payload.companyName,
-        companyCode: payload.companyCode,
-        adminName: payload.adminName,
-        employeeCode: payload.employeeCode,
-        phone: payload.phone,
-      },
-    })
-
-    if (functionError) {
-      let message = formatAppError(functionError, 'تعذر إنشاء الشركة عبر خدمة الإعداد.')
-      if (functionError instanceof FunctionsFetchError) {
-        message = 'تعذر الاتصال بدالة bootstrap-company. تأكد من تشغيل Supabase المحلي والدالة محلياً، أو من نشر الدالة على مشروع Supabase المُعدّ للتطبيق.'
-      }
-      if (functionError instanceof FunctionsHttpError) {
-        try {
-          const body = await functionError.context.json()
-          message = formatAppError(body, message)
-        } catch {
-          // keep the function error message
-        }
-      }
-      throw new Error(message)
-    }
-
-    if (data?.error) {
-      throw new Error(formatAppError(data.error, 'تعذر إنشاء الشركة.'))
-    }
-
-    window.localStorage.removeItem('emora_pending_setup')
-    window.localStorage.removeItem('emora_pending_verification_email')
-    if (data?.auditLogged === false) {
-      throw new Error('تم إنشاء الشركة بنجاح، لكن تعذر حفظ سجل التدقيق. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع مسؤول النظام.')
-    }
-    const { data: accessData, error: accessError } = await supabase.rpc('app_current_access')
-    if (accessError) {
-      throw new Error('تم إنشاء الشركة، لكن تعذر تحميل صلاحيات الدخول. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع الدعم.')
-    }
-    const access = accessData as AppAccess | null
-    const isOwnerOfCreatedCompany =
-      access?.company_id === data?.companyId &&
-      access?.roles?.some(role => role.code === 'COMPANY_OWNER')
-    if (!isOwnerOfCreatedCompany) {
-      throw new Error('تم إنشاء الشركة، لكن تعذر تأكيد عضوية المالك. لا تعاود إعداد الشركة؛ سجّل الدخول أو تواصل مع الدعم.')
-    }
-    router.push(hasAdminAccess(access) ? '/dashboard' : '/portal')
+  async function bootstrapCompany(payload: CompanySetupPayload) {
+    await bootstrapNewCompany(payload)
+    router.push('/dashboard')
     router.refresh()
   }
 
@@ -154,7 +99,7 @@ export function SetupForm() {
     const form = new FormData(event.currentTarget)
     const email = String(form.get('email')).trim().toLowerCase()
     const password = String(form.get('password'))
-    const payload: SetupPayload = {
+    const payload: CompanySetupPayload = {
       companyName: String(form.get('companyName')).trim(),
       companyCode: String(form.get('companyCode')).trim().toUpperCase(),
       adminName: String(form.get('adminName')).trim(),
