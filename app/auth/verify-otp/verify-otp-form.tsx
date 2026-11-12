@@ -3,10 +3,9 @@
 import { ClipboardEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Check, CheckCircle2, LoaderCircle, Mail } from 'lucide-react'
+import { ArrowRight, CheckCircle2, LoaderCircle, Mail } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { OnboardingProgress } from '@/components/onboarding-progress'
-import { Skeleton } from '@/components/skeleton'
 import { bootstrapNewCompany, type CompanySetupPayload } from '@/lib/company-bootstrap'
 import {
   applySignupOtpInput,
@@ -27,6 +26,7 @@ export function VerifyOtpForm() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const inputs = useRef<Array<HTMLInputElement | null>>([])
+  const fieldset = useRef<HTMLFieldSetElement | null>(null)
   const verificationInFlight = useRef(false)
   const code = digits.join('')
 
@@ -55,6 +55,19 @@ export function VerifyOtpForm() {
 
   function updateDigit(position: number, value: string) {
     const result = applySignupOtpInput(digits, value, position)
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      result.digits.forEach((digit, index) => {
+        if (!digit || digit === digits[index]) return
+        inputs.current[index]?.animate(
+          [
+            { transform: 'scale(.92)' },
+            { transform: 'scale(1.055)' },
+            { transform: 'scale(1)' },
+          ],
+          { duration: 260, easing: 'cubic-bezier(.2,.9,.3,1.16)' },
+        )
+      })
+    }
     setDigits(result.digits)
     setError('')
     inputs.current[result.focusIndex]?.focus()
@@ -85,6 +98,20 @@ export function VerifyOtpForm() {
     if (!pasted) return
     event.preventDefault()
     updateDigit(position, pasted)
+  }
+
+  function shakeInputs() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    fieldset.current?.animate(
+      [
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-4px)' },
+        { transform: 'translateX(3px)' },
+        { transform: 'translateX(-2px)' },
+        { transform: 'translateX(0)' },
+      ],
+      { duration: 340, easing: 'cubic-bezier(.2,.8,.2,1)' },
+    )
   }
 
   async function verifyCode(submittedCode: string) {
@@ -130,6 +157,7 @@ export function VerifyOtpForm() {
     } catch (caught) {
       verificationInFlight.current = false
       setVerificationState('idle')
+      shakeInputs()
       const detail = formatAppError(caught, '').toLowerCase()
       setError(
         detail.includes('expired') || detail.includes('invalid') || detail.includes('otp_expired')
@@ -173,16 +201,24 @@ export function VerifyOtpForm() {
       </header>
 
       <section className="otp-card" aria-labelledby="otp-title">
-        <div className={`otp-icon otp-icon-${verificationState}`} role="status" aria-live="polite" aria-label={verificationState === 'verifying' ? 'جارٍ التحقق من الرمز' : verificationState === 'success' ? 'تم التحقق بنجاح' : undefined}>
-          {verificationState === 'verifying' ? <LoaderCircle className="otp-icon-roll" size={24} aria-hidden="true" /> : verificationState === 'success' ? <Check className="otp-icon-check" size={25} aria-hidden="true" /> : <Mail size={23} aria-hidden="true" />}
+        <div className={`otp-icon otp-icon-${verificationState}`} aria-hidden="true">
+          {verificationState === 'verifying' ? (
+            <svg className="otp-progress-ring" viewBox="0 0 40 40" aria-hidden="true">
+              <circle className="otp-ring-track" cx="20" cy="20" r="16" />
+              <circle className="otp-ring-progress" cx="20" cy="20" r="16" />
+            </svg>
+          ) : verificationState === 'success' ? (
+            <svg className="otp-icon-check" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m5 12.5 4.3 4.3L19 7.2" />
+            </svg>
+          ) : <Mail size={22} aria-hidden="true" />}
         </div>
-        <p className="otp-kicker">خطوة واحدة لإكمال التسجيل</p>
         <h1 id="otp-title">أدخل رمز التحقق</h1>
         <p className="otp-description">أرسلنا رمزًا مكوّنًا من 8 أرقام إلى بريدك الإلكتروني.</p>
         {email && <p className="otp-email" dir="ltr"><bdi>{email}</bdi></p>}
 
         <form className="otp-form" onSubmit={verify}>
-          <fieldset className="otp-fieldset" disabled={loading || resending}>
+          <fieldset ref={fieldset} className="otp-fieldset" disabled={loading || resending}>
             <legend>رمز التحقق</legend>
             <div className="otp-inputs" dir="ltr" aria-label="رمز التحقق المكوّن من 8 أرقام">
               {digits.map((digit, index) => (
@@ -191,7 +227,6 @@ export function VerifyOtpForm() {
                   className={digit ? 'is-filled' : undefined}
                   ref={element => { inputs.current[index] = element }}
                   aria-label={`رقم التحقق ${index + 1} من 8`}
-                  aria-describedby="otp-help"
                   autoComplete={index === 0 ? 'one-time-code' : 'off'}
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -204,17 +239,14 @@ export function VerifyOtpForm() {
                 />
               ))}
             </div>
-            <span id="otp-help" className="otp-help">يمكنك كتابة الرمز أو لصقه، وسنوزع أرقامه تلقائيًا.</span>
           </fieldset>
 
+          {loading && <p className="otp-working" role="status" aria-live="polite">جارٍ تأكيد البريد وإنشاء الشركة…</p>}
           {error && <div className="form-error" role="alert">{error}</div>}
           {message && <div className="form-success" role="status" aria-live="polite"><CheckCircle2 size={18} />{message}</div>}
 
-          <button className="button button-primary button-full" disabled={loading || resending || !isSignupOtpValid(code) || !email}>
-            {loading ? <><Skeleton size={18} /> جارٍ التحقق…</> : 'تأكيد البريد والمتابعة'}
-          </button>
           <button type="button" className="otp-resend" onClick={() => void resendCode()} disabled={loading || resending || !email}>
-            {resending ? <><Skeleton size={16} /> جارٍ إرسال رمز جديد…</> : 'إعادة إرسال الرمز'}
+            {resending ? <><LoaderCircle className="otp-resend-spinner" size={15} /> جارٍ الإرسال…</> : 'إعادة إرسال الرمز'}
           </button>
         </form>
 

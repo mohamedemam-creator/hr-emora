@@ -11,7 +11,6 @@ export type CompanySetupPayload = {
   email: string
 }
 
-/** Completes the authenticated signup's company bootstrap and confirms its owner access. */
 export async function bootstrapNewCompany(payload: CompanySetupPayload): Promise<void> {
   const supabase = createClient()
   const { data, error: functionError } = await supabase.functions.invoke('bootstrap-company', {
@@ -30,12 +29,8 @@ export async function bootstrapNewCompany(payload: CompanySetupPayload): Promise
       message = 'تعذر الاتصال بدالة bootstrap-company. تأكد من تشغيل Supabase المحلي والدالة محلياً، أو من نشر الدالة على مشروع Supabase المُعدّ للتطبيق.'
     }
     if (functionError instanceof FunctionsHttpError) {
-      try {
-        const body = await functionError.context.json()
-        message = formatAppError(body, message)
-      } catch {
-        // Keep the original Edge Function error when its response is not JSON.
-      }
+      const body = await functionError.context.json().catch(() => null)
+      if (body) message = formatAppError(body, message)
     }
     throw new Error(message)
   }
@@ -43,8 +38,6 @@ export async function bootstrapNewCompany(payload: CompanySetupPayload): Promise
   if (data?.error) {
     throw new Error(formatAppError(data.error, 'تعذر إنشاء الشركة.'))
   }
-  // The Edge Function has created the company; never replay a successful bootstrap
-  // just because a later audit/access lookup fails.
   window.localStorage.removeItem('emora_pending_setup')
   window.localStorage.removeItem('emora_pending_verification_email')
   if (data?.auditLogged === false) {
