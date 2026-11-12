@@ -61,7 +61,7 @@ as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); can_view_all boolean:=public.has_permission('leaves.approve');
 begin
  if auth.uid() is null or c is null or e is null then raise exception 'active employee membership required' using errcode='42501'; end if;
- return query select lr.id,emp.id,emp.employee_code,emp.full_name,b.name,lt.name,lr.starts_on,lr.ends_on,lr.requested_days,lr.reason,lr.status,reviewer.full_name,lr.reviewer_notes,lr.created_at,
+ return query select lr.id as id,emp.id as employee_id,emp.employee_code as employee_code,emp.full_name as employee_name,b.name as branch_name,lt.name as leave_type_name,lr.starts_on as starts_on,lr.ends_on as ends_on,lr.requested_days as requested_days,lr.reason as reason,lr.status as status,reviewer.full_name as reviewer_name,lr.reviewer_notes as reviewer_notes,lr.created_at as created_at,
   coalesce(w.current_stage,'completed'),lr.status='pending' and (
    (w.current_stage='branch' and public.has_permission('leaves.approve',w.branch_id,w.region_id,'BRANCH_MANAGER'))
    or (w.current_stage='region' and public.has_permission('leaves.approve',w.branch_id,w.region_id,'AREA_MANAGER'))
@@ -224,9 +224,9 @@ begin
  select coalesce(companies.timezone,'Africa/Cairo') into tz
   from public.companies as companies where companies.id=c;
  month_value:=coalesce(date_trunc('month',p_month)::date,date_trunc('month',clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date);
- return query select hourly_permissions.id,hourly_permissions.permission_date,hourly_permissions.permission_type,
-  hourly_permissions.requested_minutes,hourly_permissions.reason,hourly_permissions.status,
-  hourly_permissions.review_note,hourly_permissions.reviewed_at,hourly_permissions.created_at
+ return query select hourly_permissions.id as id,hourly_permissions.permission_date as permission_date,hourly_permissions.permission_type as permission_type,
+  hourly_permissions.requested_minutes as requested_minutes,hourly_permissions.reason as reason,hourly_permissions.status as status,
+  hourly_permissions.review_note as review_note,hourly_permissions.reviewed_at as reviewed_at,hourly_permissions.created_at as created_at
   from public.employee_hour_permissions as hourly_permissions
   where hourly_permissions.company_id=c and hourly_permissions.employee_id=e
    and date_trunc('month',hourly_permissions.permission_date)=month_value
@@ -245,7 +245,7 @@ begin
  select coalesce(companies.timezone,'Africa/Cairo') into tz
   from public.companies as companies where companies.id=c;
  m:=coalesce(date_trunc('month',p_month)::date,date_trunc('month',clock_timestamp() at time zone coalesce(tz,'Africa/Cairo'))::date);
- return query select hourly_permissions.id,emp.id,emp.employee_code,emp.full_name,b.name,hourly_permissions.permission_date,hourly_permissions.permission_type,hourly_permissions.requested_minutes,hourly_permissions.reason,hourly_permissions.status,reviewer.full_name,hourly_permissions.review_note,hourly_permissions.reviewed_at,hourly_permissions.created_at,
+ return query select hourly_permissions.id as id,emp.id as employee_id,emp.employee_code as employee_code,emp.full_name as employee_name,b.name as branch_name,hourly_permissions.permission_date as permission_date,hourly_permissions.permission_type as permission_type,hourly_permissions.requested_minutes as requested_minutes,hourly_permissions.reason as reason,hourly_permissions.status as status,reviewer.full_name as reviewer_name,hourly_permissions.review_note as review_note,hourly_permissions.reviewed_at as reviewed_at,hourly_permissions.created_at as created_at,
   coalesce(w.current_stage,'completed'),hourly_permissions.status='pending' and (
    (w.current_stage='branch' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'BRANCH_MANAGER'))
    or (w.current_stage='region' and public.has_permission('hour_permissions.approve',w.branch_id,w.region_id,'AREA_MANAGER'))

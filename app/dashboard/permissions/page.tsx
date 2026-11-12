@@ -1,7 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Check,FileClock,Loader2,RefreshCw,X,XCircle } from 'lucide-react'
+import {
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { Check,
+  FileClock,
+  RefreshCw,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type PermissionRequest = {
@@ -118,11 +127,11 @@ export default function HourPermissionsPage(){
         <option value="cancelled">ملغي</option>
       </select></label>
       <button className="button button-primary" onClick={()=>void load()} disabled={loading}>
-        <RefreshCw className={loading?'spin':''} size={18}/>تحديث</button>
+        {loading?<Skeleton size={18}/>:<RefreshCw size={18}/>}تحديث</button>
     </section>
 
     <section className="panel data-table-panel">
-      {loading?<div className="empty-state"><Loader2 className="spin" size={30}/><strong>جارٍ تحميل الأذونات...</strong></div>:
+      {loading?<div className="empty-state"><Skeleton size={30} /><strong>جارٍ تحميل الأذونات...</strong></div>:
       rows.length===0?<div className="empty-state"><FileClock size={42}/><strong>لا توجد أذونات مطابقة</strong>
         <span>غيّر الشهر أو الحالة ثم اضغط تحديث.</span></div>:
       <div className="responsive-table"><table className="data-table">
@@ -155,7 +164,7 @@ export default function HourPermissionsPage(){
         <label>ملاحظات المدير<textarea rows={4} value={notes} onChange={event=>setNotes(event.target.value)}/></label>
         <button className={`button button-full ${reviewing.approve?'button-primary':'button-danger-soft'}`}
           disabled={loading} onClick={()=>void review()}>
-          {loading?<Loader2 className="spin" size={18}/>:reviewing.approve?<Check size={18}/>:<X size={18}/>}
+          {loading?<Skeleton size={18} />:reviewing.approve?<Check size={18}/>:<X size={18}/>}
           تأكيد القرار
         </button>
       </section>

@@ -126,7 +126,7 @@ export default function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <Logo />
+        <Logo light />
 
         <div className="auth-heading">
           <span className="eyebrow">مرحبًا بعودتك</span>

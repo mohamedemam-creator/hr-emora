@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import {
   ArrowUpLeft,
   Building2,
   Clock3,
-  Loader2,
   Plus,
   Search,
   UserCheck,
@@ -241,7 +244,7 @@ export default function DashboardPage() {
               <div className="stat-icon"><Icon size={22} /></div>
               <span>{label}</span>
               <strong>
-                {loading ? <Loader2 className="spin" size={24} /> : value}
+                {loading ? <Skeleton size={24} /> : value}
               </strong>
               <small>{detail}</small>
               <span className="stat-card-open-hint">
@@ -258,7 +261,7 @@ export default function DashboardPage() {
               <div className="stat-icon"><Icon size={22} /></div>
               <span>{label}</span>
               <strong>
-                {loading ? <Loader2 className="spin" size={24} /> : value}
+                {loading ? <Skeleton size={24} /> : value}
               </strong>
               <small>{detail}</small>
               <span className="stat-card-open-hint">
@@ -270,7 +273,7 @@ export default function DashboardPage() {
               <div className="stat-icon"><Icon size={22} /></div>
               <span>{label}</span>
               <strong>
-                {loading ? <Loader2 className="spin" size={24} /> : value}
+                {loading ? <Skeleton size={24} /> : value}
               </strong>
               <small>{detail}</small>
             </article>
@@ -296,7 +299,7 @@ export default function DashboardPage() {
 
           {loading ? (
             <div className="real-chart-empty">
-              <Loader2 className="spin" /> جارٍ تحميل البيانات...
+              <Skeleton /> جارٍ تحميل البيانات...
             </div>
           ) : summary.weekly_attendance.length === 0 ||
             summary.weekly_attendance.every(
@@ -379,7 +382,7 @@ export default function DashboardPage() {
                 disabled={lateLoading}
               >
                 {lateLoading ? (
-                  <Loader2 className="spin" size={15} />
+                  <Skeleton size={15} />
                 ) : (
                   'تحديث'
                 )}
@@ -403,7 +406,7 @@ export default function DashboardPage() {
 
             {lateLoading ? (
               <div className="dashboard-late-empty">
-                <Loader2 className="spin" />
+                <Skeleton />
                 <span>جارٍ تحميل المتأخرين...</span>
               </div>
             ) : filteredLateEmployees.length === 0 ? (

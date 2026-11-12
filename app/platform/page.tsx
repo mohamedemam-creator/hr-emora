@@ -1,8 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import { useRouter } from 'next/navigation'
-import { Building2, Loader2, ShieldCheck } from 'lucide-react'
+import { Building2,
+  ShieldCheck,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { AppAccess } from '@/lib/app-access'
 import { Logo } from '@/components/logo'
@@ -73,14 +78,14 @@ export default function PlatformPage() {
     <section className="platform-content">
       <div className="auth-heading"><span className="eyebrow">PLATFORM_SUPER_ADMIN</span><h1>الشركات</h1><p>هوية المنصة مستقلة عن عضويات وأدوار الشركات.</p></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-      {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الشركات...</strong></div> :
+      {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل الشركات...</strong></div> :
         companies.length === 0 ? <div className="empty-state"><Building2/><strong>لا توجد شركات بعد</strong></div> :
           <div className="responsive-table"><table className="data-table"><thead><tr><th>الشركة</th><th>الكود</th><th>المنطقة الزمنية</th><th>الحالة</th><th>سياق المنصة</th><th>الإجراء</th></tr></thead><tbody>
             {companies.map(company => <tr key={company.id}>
               <td>{company.name}</td><td>{company.code}</td><td>{company.timezone}</td><td>{company.status}</td>
               <td>{selectedCompanyId === company.id ? 'محدد' : '—'}</td>
               <td><div className="row-actions">
-                <button disabled={Boolean(workingId)} onClick={() => void selectCompany(company.id)}>{workingId === company.id ? <Loader2 className="spin" size={16}/> : 'اختيار'}</button>
+                <button disabled={Boolean(workingId)} onClick={() => void selectCompany(company.id)}>{workingId === company.id ? <Skeleton size={16} /> : 'اختيار'}</button>
                 {company.status !== 'closed' && <button disabled={Boolean(workingId)} onClick={() => void toggleCompany(company)}>{company.status === 'active' ? 'تعليق' : 'تفعيل'}</button>}
               </div></td>
             </tr>)}

@@ -25,6 +25,8 @@ Files:
 17. `0017_leave_type_management.sql` — company-authorized leave-type listing and create/update/deactivate RPCs used by Dashboard Settings.
 18. `0018_profile_branch_and_mobile_device_apis.sql` — authenticated self-profile read, separate area/branch manager assignments, and tenant-checked mobile-device request/activation RPCs using only `active`, `released`, and `revoked` states.
 19. `0019_company_leave_policies.sql` — company-level annual, monthly, and sick leave limits, leave-type quota categories, and a database trigger that enforces configured caps.
+20. `0020_qualified_request_list_rpcs.sql` — replaces the leave and hour-permission list RPCs with fully qualified joined columns and refreshes the PostgREST schema cache.
+21. `0021_shift_assignment_upsert.sql` — applies employee/date upserts to manager shift saves and approved shift requests to avoid duplicate-key failures while retaining company checks.
 
 The local `ios-web-attendance` Edge Function verifies the enrolled P-256 browser key and forwards the caller JWT to permission-checked RPCs. The active leave, hour permission, penalty, payroll, and account-device calls have local definitions. Leave types are seeded as generic paid/unpaid choices during company bootstrap, with no statutory entitlement; companies can configure these types in Settings. Migration 0019 adds company-level annual, monthly, and sick caps and enforces configured limits for pending and approved requests. Leave attachment-required types cannot be submitted because the portal has no upload flow. Leave and hour approvals use the existing branch-manager review followed by area-manager final review; the workflow is fixed to those two stages rather than configurable by company.
 

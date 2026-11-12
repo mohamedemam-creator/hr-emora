@@ -1,7 +1,19 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Edit3, Loader2, MapPinned, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { CheckCircle2,
+  Edit3,
+  MapPinned,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Region = {
@@ -150,7 +162,7 @@ export default function RegionsPage() {
           <div className="form-note">مدير المنطقة لن يرى أي فرع تابع لمنطقة أخرى. يجب بعد ذلك ربط كل فرع بمنطقته وربط الموظفين بالفروع.</div>
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
-          <button className="button button-primary button-full" disabled={saving}>{saving ? <Loader2 className="spin" size={18}/> : <MapPinned size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ المنطقة'}</button>
+          <button className="button button-primary button-full" disabled={saving}>{saving ? <Skeleton size={18} /> : <MapPinned size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ المنطقة'}</button>
         </form>
       </main>
     )
@@ -170,9 +182,9 @@ export default function RegionsPage() {
       </section>
 
       <section className="panel data-table-panel">
-        {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل المناطق...</strong></div> : filtered.length === 0 ? <div className="empty-state"><MapPinned/><strong>لا توجد مناطق</strong><span>ابدأ بإضافة أول منطقة وتعيين مديرها.</span><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة منطقة</button></div> : (
+        {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل المناطق...</strong></div> : filtered.length === 0 ? <div className="empty-state"><MapPinned/><strong>لا توجد مناطق</strong><span>ابدأ بإضافة أول منطقة وتعيين مديرها.</span><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة منطقة</button></div> : (
           <div className="responsive-table"><table className="data-table"><thead><tr><th>المنطقة</th><th>مدير المنطقة</th><th>الفروع</th><th>الموظفون</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
-            {filtered.map(region => <tr key={region.id}><td><div className="primary-cell"><strong>{region.name}</strong><span>{region.code}</span></div></td><td>{region.manager_name ?? 'لم يتم التعيين'}</td><td>{region.branch_count}</td><td>{region.employee_count}</td><td><span className={`status-badge ${region.is_active ? 'active' : 'inactive'}`}>{region.is_active ? 'نشطة' : 'غير نشطة'}</span></td><td><div className="row-actions"><button title="تعديل" onClick={() => openEdit(region)}><Edit3 size={17}/></button><button className="danger" title="حذف" disabled={workingId === region.id} onClick={() => void deleteRegion(region)}>{workingId === region.id ? <Loader2 className="spin" size={16}/> : <Trash2 size={17}/>}</button></div></td></tr>)}
+            {filtered.map(region => <tr key={region.id}><td><div className="primary-cell"><strong>{region.name}</strong><span>{region.code}</span></div></td><td>{region.manager_name ?? 'لم يتم التعيين'}</td><td>{region.branch_count}</td><td>{region.employee_count}</td><td><span className={`status-badge ${region.is_active ? 'active' : 'inactive'}`}>{region.is_active ? 'نشطة' : 'غير نشطة'}</span></td><td><div className="row-actions"><button title="تعديل" onClick={() => openEdit(region)}><Edit3 size={17}/></button><button className="danger" title="حذف" disabled={workingId === region.id} onClick={() => void deleteRegion(region)}>{workingId === region.id ? <Skeleton size={16} /> : <Trash2 size={17}/>}</button></div></td></tr>)}
           </tbody></table></div>
         )}
       </section>

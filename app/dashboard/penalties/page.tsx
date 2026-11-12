@@ -1,7 +1,21 @@
 'use client'
 
-import { FormEvent,useEffect,useMemo,useState } from 'react'
-import { AlertTriangle,Ban,Check,CheckCircle2,Download,Loader2,Plus,ShieldAlert,X,XCircle } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { AlertTriangle,
+  Ban,
+  Check,
+  CheckCircle2,
+  Download,
+  Plus,
+  ShieldAlert,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Employee={id:string;employee_code:string;full_name:string;branch_name:string|null;employment_status:string}
@@ -272,7 +286,7 @@ export default function PenaltiesPage(){
       <div className="portal-section-heading" style={{padding:'18px 18px 0'}}>
         <div><h2>طلبات اعتماد الجزاءات</h2><p>طلبات مدير الفرع قبل تحويلها إلى جزاءات فعلية.</p></div>
       </div>
-      {loading?<div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الطلبات...</strong></div>:
+      {loading?<div className="empty-state"><Skeleton /><strong>جارٍ تحميل الطلبات...</strong></div>:
       requests.length===0?<div className="empty-state"><ShieldAlert/><strong>لا توجد طلبات جزاءات</strong></div>:
       <div className="responsive-table"><table className="data-table">
         <thead><tr><th>الموظف</th><th>الفرع</th><th>النوع</th><th>العنوان والسبب</th>
@@ -327,7 +341,7 @@ export default function PenaltiesPage(){
     </section>
 
     <section className="panel data-table-panel">
-      {loading?<div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الجزاءات...</strong></div>:
+      {loading?<div className="empty-state"><Skeleton /><strong>جارٍ تحميل الجزاءات...</strong></div>:
       filteredRows.length===0?<div className="empty-state"><ShieldAlert/><strong>لا توجد جزاءات مسجلة</strong></div>:
       <div className="responsive-table"><table className="data-table">
         <thead><tr><th>الموظف</th><th>الفرع</th><th>النوع</th><th>العنوان والسبب</th><th>القيمة</th>
@@ -346,7 +360,7 @@ export default function PenaltiesPage(){
       </table></div>}
     </section>
 
-    {open&&<div className="modal-backdrop"><form className="account-modal" onSubmit={submit}>
+    {open&&<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setOpen(false)}}><form className="account-modal" onSubmit={submit}>
       <button type="button" className="modal-close" onClick={()=>setOpen(false)}><XCircle/></button>
       <div className="module-placeholder-icon"><AlertTriangle size={30}/></div><h2>إضافة طلب جزاء</h2>
       {hasPenaltyManage&&!hasPenaltyApprove&&<div className="form-note">سيتم إرسال الجزاء إلى مالك الشركة، ولن يصبح فعليًا قبل اعتماده.</div>}
@@ -365,7 +379,7 @@ export default function PenaltiesPage(){
       <label>تاريخ التطبيق<input type="date" required value={form.effectiveDate}
         onChange={e=>setForm(c=>({...c,effectiveDate:e.target.value}))}/></label>
       <button className="button button-primary button-full" disabled={loading}>
-        {loading?<Loader2 className="spin" size={18}/>:<Plus size={18}/>}إرسال الجزاء للاعتماد</button>
+        {loading?<Skeleton size={18} />:<Plus size={18}/>}إرسال الجزاء للاعتماد</button>
     </form></div>}
 
     {reviewing&&<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReviewing(null)}}>
@@ -375,7 +389,7 @@ export default function PenaltiesPage(){
         <label>ملاحظات المراجع<textarea rows={4} value={reviewNote} onChange={event=>setReviewNote(event.target.value)}/></label>
         <button className={`button button-full ${reviewing.approve?'button-primary':'button-danger-soft'}`}
           disabled={loading} onClick={()=>void reviewPenaltyRequest()}>
-          {loading?<Loader2 className="spin" size={18}/>:reviewing.approve?<Check size={18}/>:<X size={18}/>}
+          {loading?<Skeleton size={18} />:reviewing.approve?<Check size={18}/>:<X size={18}/>}
           تأكيد القرار</button>
       </section>
     </div>}

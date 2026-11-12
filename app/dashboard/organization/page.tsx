@@ -1,7 +1,19 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { BriefcaseBusiness, CheckCircle2, Edit3, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { BriefcaseBusiness,
+  CheckCircle2,
+  Edit3,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Department = { id: string; name: string; code: string; is_active: boolean; job_count: number }
@@ -119,7 +131,7 @@ export default function OrganizationPage() {
           {tab === 'jobs' && <div className="form-note">عند إضافة موظف على هذه الوظيفة، يمكن للنظام إسناد الدور الافتراضي له تلقائيًا إذا لم تختَر دورًا آخر.</div>}
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
-          <button className="button button-primary button-full" disabled={saving}>{saving ? <Loader2 className="spin" size={18}/> : <BriefcaseBusiness size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ'}</button>
+          <button className="button button-primary button-full" disabled={saving}>{saving ? <Skeleton size={18} /> : <BriefcaseBusiness size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ'}</button>
         </form>
       </main>
     )
@@ -132,10 +144,10 @@ export default function OrganizationPage() {
       {error && <div className="form-error management-message">{error}</div>}
       <section className="panel management-toolbar"><div className="table-search"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="بحث..." /></div><button className="button button-ghost" onClick={() => void loadData()}><RefreshCw size={18}/> تحديث</button></section>
       <section className="panel data-table-panel">
-        {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل البيانات...</strong></div> : tab === 'departments' ? (
-          filteredDepartments.length === 0 ? <div className="empty-state"><BriefcaseBusiness/><strong>لا توجد أقسام</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة قسم</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>القسم</th><th>عدد الوظائف</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredDepartments.map(item => <tr key={item.id}><td><div className="primary-cell"><strong>{item.name}</strong><span>{item.code}</span></div></td><td>{item.job_count}</td><td><span className={`status-badge ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openDepartment(item)}><Edit3 size={17}/></button><button className="danger" disabled={workingId === item.id} onClick={() => void deleteItem(item.id, item.name)}>{workingId === item.id ? <Loader2 className="spin" size={16}/> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>
+        {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل البيانات...</strong></div> : tab === 'departments' ? (
+          filteredDepartments.length === 0 ? <div className="empty-state"><BriefcaseBusiness/><strong>لا توجد أقسام</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة قسم</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>القسم</th><th>عدد الوظائف</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredDepartments.map(item => <tr key={item.id}><td><div className="primary-cell"><strong>{item.name}</strong><span>{item.code}</span></div></td><td>{item.job_count}</td><td><span className={`status-badge ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openDepartment(item)}><Edit3 size={17}/></button><button className="danger" disabled={workingId === item.id} onClick={() => void deleteItem(item.id, item.name)}>{workingId === item.id ? <Skeleton size={16} /> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>
         ) : (
-          filteredJobs.length === 0 ? <div className="empty-state"><BriefcaseBusiness/><strong>لا توجد مسميات وظيفية</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة وظيفة</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>المسمى الوظيفي</th><th>القسم</th><th>الدور الافتراضي</th><th>الموظفون</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredJobs.map(item => <tr key={item.id}><td><div className="primary-cell"><strong>{item.name}</strong><span>{item.code}</span></div></td><td>{item.department_name ?? 'بدون قسم'}</td><td>{item.default_role_name ?? 'غير محدد'}</td><td>{item.employee_count}</td><td><span className={`status-badge ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openJob(item)}><Edit3 size={17}/></button><button className="danger" disabled={workingId === item.id} onClick={() => void deleteItem(item.id, item.name)}>{workingId === item.id ? <Loader2 className="spin" size={16}/> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>
+          filteredJobs.length === 0 ? <div className="empty-state"><BriefcaseBusiness/><strong>لا توجد مسميات وظيفية</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة وظيفة</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>المسمى الوظيفي</th><th>القسم</th><th>الدور الافتراضي</th><th>الموظفون</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredJobs.map(item => <tr key={item.id}><td><div className="primary-cell"><strong>{item.name}</strong><span>{item.code}</span></div></td><td>{item.department_name ?? 'بدون قسم'}</td><td>{item.default_role_name ?? 'غير محدد'}</td><td>{item.employee_count}</td><td><span className={`status-badge ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openJob(item)}><Edit3 size={17}/></button><button className="danger" disabled={workingId === item.id} onClick={() => void deleteItem(item.id, item.name)}>{workingId === item.id ? <Skeleton size={16} /> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>
         )}
       </section>
     </main>

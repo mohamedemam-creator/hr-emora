@@ -1,8 +1,8 @@
 'use client'
 
 import { ReactNode, useEffect, useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
 import { hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
@@ -37,7 +37,7 @@ export function DashboardAccessGuard({ children }: { children: ReactNode }) {
   }, [router])
 
   if (!allowed) {
-    return <div className="dashboard-guard"><Loader2 className="spin"/><strong>جارٍ التحقق من الصلاحيات...</strong></div>
+    return <div className="dashboard-guard"><Skeleton /><strong>جارٍ التحقق من الصلاحيات...</strong></div>
   }
 
   return <>{children}</>

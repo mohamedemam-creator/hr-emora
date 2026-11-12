@@ -36,7 +36,7 @@ from (
 where not exists(select 1 from public.mobile_devices as mobile
  where mobile.company_id=pending.company_id and mobile.device_id=pending.device_id);
 
-create function public.app_my_profile() returns jsonb
+create or replace function public.app_my_profile() returns jsonb
 language plpgsql stable security definer set search_path=''
 as $$
 declare u uuid:=auth.uid(); result jsonb;
@@ -55,7 +55,7 @@ end; $$;
 revoke all on function public.app_my_profile() from public,anon;
 grant execute on function public.app_my_profile() to authenticated;
 
-create function public.app_list_branches_with_managers()
+create or replace function public.app_list_branches_with_managers()
 returns table(
  id uuid,region_id uuid,region_name text,region_code text,
  region_manager_employee_id uuid,region_manager_name text,
@@ -84,7 +84,7 @@ end; $$;
 revoke all on function public.app_list_branches_with_managers() from public,anon;
 grant execute on function public.app_list_branches_with_managers() to authenticated;
 
-create function public.app_save_branch_with_managers(
+create or replace function public.app_save_branch_with_managers(
  p_branch_id uuid,p_region_id uuid,p_region_manager_employee_id uuid,p_branch_manager_employee_id uuid,
  p_region_name text,p_region_code text,p_branch_name text,p_branch_code text,p_address text,
  p_latitude double precision,p_longitude double precision,p_radius integer,p_accuracy_limit integer,p_is_active boolean
@@ -157,7 +157,7 @@ end; $$;
 revoke all on function public.app_save_branch_with_managers(uuid,uuid,uuid,uuid,text,text,text,text,text,double precision,double precision,integer,integer,boolean) from public,anon;
 grant execute on function public.app_save_branch_with_managers(uuid,uuid,uuid,uuid,text,text,text,text,text,double precision,double precision,integer,integer,boolean) to authenticated;
 
-create function public.app_my_mobile_device_status() returns jsonb
+create or replace function public.app_my_mobile_device_status() returns jsonb
 language plpgsql stable security definer set search_path=''
 as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); d public.mobile_devices;
@@ -170,7 +170,7 @@ end; $$;
 revoke all on function public.app_my_mobile_device_status() from public,anon;
 grant execute on function public.app_my_mobile_device_status() to authenticated;
 
-create function public.app_my_web_attendance_access_for_device(p_device_id text) returns jsonb
+create or replace function public.app_my_web_attendance_access_for_device(p_device_id text) returns jsonb
 language plpgsql stable security definer set search_path=''
 as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); allowed_value boolean:=false; pending_value boolean:=false;
@@ -193,7 +193,7 @@ end; $$;
 revoke all on function public.app_my_web_attendance_access_for_device(text) from public,anon;
 grant execute on function public.app_my_web_attendance_access_for_device(text) to authenticated;
 
-create function public.app_request_my_mobile_device(p_device_id text) returns jsonb
+create or replace function public.app_request_my_mobile_device(p_device_id text) returns jsonb
 language plpgsql security definer set search_path=''
 as $$
 declare c uuid:=public.current_company_id(); e uuid:=public.current_employee_id(); d public.mobile_devices; old_status text; old_employee uuid;
@@ -256,7 +256,7 @@ end; $$;
 revoke all on function public.app_employee_mobile_device_status(uuid) from public,anon;
 grant execute on function public.app_employee_mobile_device_status(uuid) to authenticated;
 
-create function public.app_activate_employee_mobile_device(p_employee_id uuid,p_device_id text) returns void
+create or replace function public.app_activate_employee_mobile_device(p_employee_id uuid,p_device_id text) returns void
 language plpgsql security definer set search_path=''
 as $$
 declare c uuid:=app_private.require_company_permission('devices.approve'); actor uuid:=auth.uid(); d public.mobile_devices;

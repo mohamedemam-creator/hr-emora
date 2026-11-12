@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Bell, Menu } from 'lucide-react'
+import { ArrowRight, Bell, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Access = {
@@ -13,8 +13,12 @@ type Access = {
 
 export function Topbar({
   onMenuToggle,
+  onSidebarToggle,
+  sidebarCollapsed = false,
 }: {
   onMenuToggle?: () => void
+  onSidebarToggle?: () => void
+  sidebarCollapsed?: boolean
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -83,6 +87,15 @@ export function Topbar({
         onClick={onMenuToggle}
       >
         <Menu />
+      </button>
+      <button
+        type="button"
+        className="icon-button sidebar-toggle"
+        aria-label={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+        aria-pressed={sidebarCollapsed}
+        onClick={onSidebarToggle}
+      >
+        {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
       </button>
 
       <div className="topbar-context" aria-live="polite">

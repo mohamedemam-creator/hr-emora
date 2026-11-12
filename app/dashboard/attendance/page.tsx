@@ -1,6 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import {
   CalendarPlus,
   CheckCircle2,
@@ -8,7 +13,6 @@ import {
   Edit3,
   FileSpreadsheet,
   History,
-  Loader2,
   RefreshCw,
   Save,
   X,
@@ -399,7 +403,7 @@ export default function AttendancePage() {
       <section className="panel data-table-panel">
         {loading ? (
           <div className="empty-state">
-            <Loader2 className="spin" />
+            <Skeleton />
             <strong>جارٍ تحميل الحضور...</strong>
           </div>
         ) : rows.length === 0 ? (
@@ -731,7 +735,7 @@ export default function AttendancePage() {
               disabled={saving}
             >
               {saving ? (
-                <Loader2 className="spin" size={18} />
+                <Skeleton size={18} />
               ) : (
                 <Save size={18} />
               )}

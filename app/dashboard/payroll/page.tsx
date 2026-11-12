@@ -1,6 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import {
   BadgeCheck,
   Banknote,
@@ -8,7 +13,6 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   LockKeyhole,
-  Loader2,
   Pencil,
   Printer,
   RefreshCw,
@@ -389,7 +393,7 @@ export default function PayrollPage() {
               onClick={() => void calculate()}
             >
               {action === 'calculate' ? (
-                <Loader2 className="spin" size={18} />
+                <Skeleton size={18} />
               ) : (
                 <Calculator size={18} />
               )}
@@ -546,7 +550,7 @@ export default function PayrollPage() {
           <section className="panel data-table-panel payroll-table-panel">
             {loading ? (
               <div className="empty-state">
-                <Loader2 className="spin" />
+                <Skeleton />
                 <strong>جارٍ تحميل الرواتب...</strong>
               </div>
             ) : filtered.length === 0 ? (
@@ -748,7 +752,7 @@ export default function PayrollPage() {
               disabled={action === 'adjust'}
             >
               {action === 'adjust' ? (
-                <Loader2 className="spin" size={18} />
+                <Skeleton size={18} />
               ) : (
                 <CheckCircle2 size={18} />
               )}
@@ -877,7 +881,7 @@ export default function PayrollPage() {
       )}
 
       {reopenOpen && cycle && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReopenOpen(false)}}>
           <form className="account-modal" onSubmit={reopen}>
             <button
               type="button"

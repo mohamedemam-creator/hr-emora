@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, CheckCircle2, KeyRound, Mail, Phone, UserRound } from 'lucide-react'
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { Logo } from '@/components/logo'
+import { OnboardingProgress } from '@/components/onboarding-progress'
 import { waitForAuthSession } from '@/lib/auth-confirmation'
-import { isSignupOtpValid, normalizeSignupOtp } from '@/lib/signup-otp'
 import { formatAppError, hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { createClient } from '@/lib/supabase/client'
 
@@ -26,22 +26,11 @@ export function SetupForm() {
   const [authPending, setAuthPending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [verificationEmail, setVerificationEmail] = useState('')
-  const [otpCode, setOtpCode] = useState('')
-  const [verificationPending, setVerificationPending] = useState(false)
-  const [resendingCode, setResendingCode] = useState(false)
   const hasAuthCallbackError = searchParams.get('error') === 'auth'
 
   useEffect(() => {
     let active = true
     const pendingData = window.localStorage.getItem('emora_pending_setup')
-    const pendingEmail = window.localStorage.getItem('emora_pending_verification_email')
-
-    if (pendingEmail) {
-      setVerificationEmail(pendingEmail)
-      setVerificationPending(true)
-    }
-
     if (!hasAuthCallbackError && !pendingData) return
 
     async function handleEmailCallback() {
@@ -57,20 +46,12 @@ export function SetupForm() {
         if (!active) return
 
         if (!session) {
+          if (pendingData) {
+            router.replace('/auth/verify-otp')
+            return
+          }
           if (hasAuthCallbackError) {
-            if (pendingData) {
-              const payload: SetupPayload = JSON.parse(pendingData)
-              setVerificationEmail(payload.email)
-              setVerificationPending(true)
-              setError('تعذر استخدام رابط التأكيد. أدخل رمز التحقق المرسل إلى بريدك أو أعد إرسال الرمز.')
-            } else {
-              setError('تعذر تأكيد البريد الإلكتروني. سجّل الدخول أو اطلب رمز تحقق جديداً من صفحة الإعداد.')
-            }
-          } else if (pendingData) {
-            const payload: SetupPayload = JSON.parse(pendingData)
-            setVerificationEmail(payload.email)
-            setVerificationPending(true)
-            setMessage('أدخل رمز التحقق المكوّن من 8 أرقام المرسل إلى بريدك لإكمال إعداد الشركة.')
+            setError('تعذر تأكيد البريد الإلكتروني. سجّل الدخول أو ابدأ التسجيل مجدداً لطلب رمز تحقق جديد.')
           }
           return
         }
@@ -166,10 +147,6 @@ export function SetupForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (verificationPending) {
-      await verifySignupOtp()
-      return
-    }
     setLoading(true)
     setError('')
     setMessage('')
@@ -211,14 +188,18 @@ export function SetupForm() {
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { full_name: payload.adminName } },
+            options: {
+              data: { full_name: payload.adminName },
+              emailRedirectTo: new URL(
+                '/auth/callback?next=%2Fsetup',
+                process.env.NEXT_PUBLIC_APP_URL || window.location.origin,
+              ).toString(),
+            },
           })
           if (signUpError) throw signUpError
           hasSession = Boolean(signUpData.session)
           if (!hasSession) {
-            setVerificationEmail(email)
-            setVerificationPending(true)
-            setMessage('تم إرسال رمز تحقق مكوّن من 8 أرقام إلى بريدك. أدخله هنا لإكمال إعداد الشركة.')
+            router.push('/auth/verify-otp')
             return
           }
         }
@@ -232,74 +213,11 @@ export function SetupForm() {
     }
   }
 
-  async function verifySignupOtp() {
-    const code = normalizeSignupOtp(otpCode)
-    if (!verificationEmail || !isSignupOtpValid(code)) {
-      setError('أدخل رمز التحقق المكوّن من 8 أرقام.')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setMessage('')
-    try {
-      const pendingData = window.localStorage.getItem('emora_pending_setup')
-      if (!pendingData) throw new Error('بيانات إعداد الشركة غير موجودة. أعد بدء التسجيل.')
-      const payload: SetupPayload = JSON.parse(pendingData)
-      if (payload.email.trim().toLowerCase() !== verificationEmail.trim().toLowerCase()) {
-        throw new Error('البريد لا يطابق بيانات التسجيل. أعد بدء التسجيل بالبريد نفسه.')
-      }
-
-      const supabase = createClient()
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email: verificationEmail,
-        token: code,
-        type: 'email',
-      })
-      if (verifyError) throw verifyError
-      const verifiedEmail = data.user?.email?.trim().toLowerCase()
-      if (!data.session || verifiedEmail !== payload.email.trim().toLowerCase()) {
-        throw new Error('تم التحقق من حساب مختلف عن بيانات إعداد الشركة. سجّل الدخول بالبريد المستخدم للتسجيل.')
-      }
-
-      setVerificationPending(false)
-      await bootstrapCompany(payload)
-    } catch (caught) {
-      const detail = formatAppError(caught, '')
-      const normalizedDetail = detail.toLowerCase()
-      setError(
-        normalizedDetail.includes('expired') || normalizedDetail.includes('invalid') || normalizedDetail.includes('otp_expired')
-          ? 'الرمز غير صالح أو انتهت صلاحيته. أعد إرسال رمز جديد ثم أدخل أحدث رمز وصلك.'
-          : detail || 'تعذر التحقق من الرمز. تأكد من صحته أو أعد إرسال رمز جديد.',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function resendSignupOtp() {
-    if (!verificationEmail) return
-    setResendingCode(true)
-    setError('')
-    setMessage('')
-    try {
-      const supabase = createClient()
-      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email: verificationEmail })
-      if (resendError) throw resendError
-      setOtpCode('')
-      setMessage('تم إرسال رمز تحقق جديد. استخدم أحدث رمز وصلك إلى البريد الإلكتروني.')
-    } catch (caught) {
-      setError(formatAppError(caught, 'تعذر إعادة إرسال الرمز. حاول بعد قليل أو سجّل الدخول إذا كان الحساب مؤكداً بالفعل.'))
-    } finally {
-      setResendingCode(false)
-    }
-  }
-
   return (
     <main className="setup-page">
       <header className="setup-header">
-        <Logo />
-        <div><span>الخطوة 1 من 2</span><strong>إعداد الشركة</strong></div>
+        <div className="setup-brand"><Logo light /></div>
+        <OnboardingProgress step={1} />
       </header>
       <section className="setup-card">
         <div className="setup-intro">
@@ -331,37 +249,11 @@ export function SetupForm() {
               </div>
             </div>
           </div>
-          {verificationPending ? (
-            <div className="form-section">
-              <div className="section-icon"><Mail size={22}/></div>
-              <div className="section-fields">
-                <h2>تأكيد البريد الإلكتروني</h2>
-                <p>أدخل رمز التحقق المكوّن من 8 أرقام المرسل إلى {verificationEmail}.</p>
-                <label className="full-column">رمز التحقق
-                  <input
-                    name="signupOtp"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    dir="ltr"
-                    maxLength={8}
-                    value={otpCode}
-                    onChange={event => setOtpCode(normalizeSignupOtp(event.target.value))}
-                    placeholder="12345678"
-                    aria-label="رمز التحقق المكوّن من 8 أرقام"
-                  />
-                </label>
-                <button className="button" type="button" onClick={resendSignupOtp} disabled={resendingCode || loading}>
-                  {resendingCode ? 'جارٍ إعادة الإرسال...' : 'إعادة إرسال الرمز'}
-                </button>
-              </div>
-            </div>
-          ) : null}
           {authPending ? <div className="form-success" role="status" aria-live="polite">جارٍ تأكيد البريد الإلكتروني واستعادة جلسة الدخول...</div> : null}
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           {message ? <div className="form-success"><CheckCircle2 size={18}/>{message}</div> : null}
-          <button className="button button-primary button-full" disabled={loading || authPending || resendingCode}>
-            {authPending ? 'جارٍ تأكيد البريد الإلكتروني...' : loading ? 'جارٍ إكمال العملية...' : verificationPending ? 'تأكيد الرمز وإنشاء الشركة' : 'إنشاء الشركة والدخول'}
+          <button className="button button-primary button-full" disabled={loading || authPending}>
+            {authPending ? 'جارٍ تأكيد البريد الإلكتروني...' : loading ? 'جارٍ إكمال العملية...' : 'إنشاء الشركة والدخول'}
           </button>
         </form>
       </section>

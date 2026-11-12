@@ -146,7 +146,7 @@ end; $$;
 revoke all on function public.app_list_shift_change_requests(uuid,date) from public,anon;
 grant execute on function public.app_list_shift_change_requests(uuid,date) to authenticated;
 
-create function public.app_request_shift_change(p_assignment_id uuid,p_employee_id uuid,p_branch_id uuid,p_template_id uuid,p_shift_date date,p_day_type text,p_start_time time,p_end_time time,p_status text,p_notes text,p_leave_type_id uuid)
+create or replace function public.app_request_shift_change(p_assignment_id uuid,p_employee_id uuid,p_branch_id uuid,p_template_id uuid,p_shift_date date,p_day_type text,p_start_time time,p_end_time time,p_status text,p_notes text,p_leave_type_id uuid)
 returns jsonb language plpgsql security definer set search_path=''
 as $$
 declare c uuid:=app_private.require_shift_permission('shifts.view_own'); actor uuid:=public.current_employee_id(); direct_value boolean:=public.has_permission('shifts.manage_branch'); old_row public.shift_assignments; aid uuid;
@@ -162,10 +162,19 @@ begin
   if not found then raise exception 'assignment is outside the selected company, employee, branch, or date' using errcode='42501'; end if;
  end if;
  if direct_value then
-  if p_assignment_id is null then insert into public.shift_assignments(company_id,employee_id,branch_id,shift_template_id,shift_date,day_type,planned_start,planned_end,status,notes,created_by)
-   values(c,p_employee_id,p_branch_id,p_template_id,p_shift_date,p_day_type,p_start_time,p_end_time,case when p_status='published' then 'published' else 'draft' end,nullif(btrim(p_notes),''),auth.uid()) returning id into aid;
+  if p_assignment_id is null then
+   select assignment.* into old_row from public.shift_assignments as assignment
+    where assignment.company_id=c and assignment.employee_id=p_employee_id and assignment.shift_date=p_shift_date
+    for update;
+   insert into public.shift_assignments(company_id,employee_id,branch_id,shift_template_id,shift_date,day_type,planned_start,planned_end,status,notes,created_by)
+   values(c,p_employee_id,p_branch_id,p_template_id,p_shift_date,p_day_type,p_start_time,p_end_time,case when p_status='published' then 'published' else 'draft' end,nullif(btrim(p_notes),''),auth.uid())
+   on conflict(employee_id,shift_date) do update set branch_id=excluded.branch_id,shift_template_id=excluded.shift_template_id,
+    day_type=excluded.day_type,planned_start=excluded.planned_start,planned_end=excluded.planned_end,
+    status=excluded.status,notes=excluded.notes,updated_at=clock_timestamp()
+   where public.shift_assignments.company_id=c returning id into aid;
+   if aid is null then raise exception 'shift assignment could not be saved in the active company' using errcode='42501'; end if;
   else update public.shift_assignments set shift_template_id=p_template_id,day_type=p_day_type,planned_start=p_start_time,planned_end=p_end_time,status=case when p_status='published' then 'published' else 'draft' end,notes=nullif(btrim(p_notes),''),updated_at=clock_timestamp() where id=p_assignment_id and company_id=c returning id into aid; end if;
-  perform app_private.audit_company_action(c,'shift.assignment_saved','shift_assignment',aid,case when p_assignment_id is null then null else to_jsonb(old_row) end,jsonb_build_object('employee_id',p_employee_id,'branch_id',p_branch_id,'shift_date',p_shift_date,'day_type',p_day_type,'status',p_status));
+  perform app_private.audit_company_action(c,'shift.assignment_saved','shift_assignment',aid,case when old_row.id is null then null else to_jsonb(old_row) end,jsonb_build_object('employee_id',p_employee_id,'branch_id',p_branch_id,'shift_date',p_shift_date,'day_type',p_day_type,'status',p_status));
   return jsonb_build_object('applied',true,'pending',false,'message','تم حفظ الشيفت.');
  end if;
  insert into public.shift_change_requests(company_id,assignment_id,employee_id,branch_id,shift_template_id,shift_date,request_type,requested_day_type,requested_start,requested_end,requested_status,leave_type_id,notes,old_data,new_data,requested_by)
@@ -197,10 +206,10 @@ end; $$;
 revoke all on function public.app_request_shift_delete(uuid) from public,anon;
 grant execute on function public.app_request_shift_delete(uuid) to authenticated;
 
-create function public.app_review_shift_change_request(p_request_id uuid,p_decision text,p_notes text) returns void
+create or replace function public.app_review_shift_change_request(p_request_id uuid,p_decision text,p_notes text) returns void
 language plpgsql security definer set search_path=''
 as $$
-declare c uuid:=app_private.require_shift_permission('shifts.manage_branch'); q public.shift_change_requests; new_value jsonb;
+declare c uuid:=app_private.require_shift_permission('shifts.manage_branch'); q public.shift_change_requests; new_value jsonb; saved_assignment_id uuid;
 begin
  if p_decision not in ('approved','rejected') then raise exception 'invalid decision' using errcode='22023'; end if;
  select * into q from public.shift_change_requests where id=p_request_id and company_id=c and status='pending' for update;
@@ -209,9 +218,18 @@ begin
  if p_decision='approved' then
   if q.request_type='delete' then update public.shift_assignments set status='cancelled',updated_at=clock_timestamp() where id=q.assignment_id and company_id=c;
   else new_value:=q.new_data;
-   if q.assignment_id is null then insert into public.shift_assignments(company_id,employee_id,branch_id,shift_template_id,shift_date,day_type,planned_start,planned_end,status,notes,created_by)
-    values(c,q.employee_id,q.branch_id,q.shift_template_id,q.shift_date,new_value->>'day_type',(new_value->>'start_time')::time,(new_value->>'end_time')::time,coalesce(new_value->>'status','draft'),new_value->>'notes',auth.uid());
-   else update public.shift_assignments set shift_template_id=q.shift_template_id,day_type=new_value->>'day_type',planned_start=(new_value->>'start_time')::time,planned_end=(new_value->>'end_time')::time,status=coalesce(new_value->>'status','draft'),notes=new_value->>'notes',updated_at=clock_timestamp() where id=q.assignment_id and company_id=c; end if;
+   if q.assignment_id is null then
+    insert into public.shift_assignments(company_id,employee_id,branch_id,shift_template_id,shift_date,day_type,planned_start,planned_end,status,notes,created_by)
+    values(c,q.employee_id,q.branch_id,q.shift_template_id,q.shift_date,new_value->>'day_type',(new_value->>'start_time')::time,(new_value->>'end_time')::time,coalesce(new_value->>'status','draft'),new_value->>'notes',auth.uid())
+    on conflict(employee_id,shift_date) do update set branch_id=excluded.branch_id,shift_template_id=excluded.shift_template_id,
+     day_type=excluded.day_type,planned_start=excluded.planned_start,planned_end=excluded.planned_end,
+     status=excluded.status,notes=excluded.notes,updated_at=clock_timestamp()
+    where public.shift_assignments.company_id=c returning id into saved_assignment_id;
+    if saved_assignment_id is null then raise exception 'shift assignment could not be saved in the active company' using errcode='42501'; end if;
+   else
+    update public.shift_assignments set shift_template_id=q.shift_template_id,day_type=new_value->>'day_type',planned_start=(new_value->>'start_time')::time,planned_end=(new_value->>'end_time')::time,status=coalesce(new_value->>'status','draft'),notes=new_value->>'notes',updated_at=clock_timestamp() where id=q.assignment_id and company_id=c returning id into saved_assignment_id;
+    if saved_assignment_id is null then raise exception 'shift assignment no longer exists in the active company' using errcode='P0002'; end if;
+   end if;
   end if;
  end if;
  update public.shift_change_requests set status=p_decision,reviewed_by=public.current_employee_id(),reviewed_at=clock_timestamp(),reviewer_notes=nullif(btrim(p_notes),'') where id=q.id and company_id=c;

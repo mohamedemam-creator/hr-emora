@@ -1,7 +1,15 @@
 'use client'
 
-import { FormEvent,useEffect,useState } from 'react'
-import { Check,Loader2,Plus,Save,X } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { Check,
+  Plus,
+  Save,
+  X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type QuotaCategory='annual'|'monthly'|'sick'|'custom'
@@ -89,7 +97,7 @@ export default function SettingsPage(){
      <label>الحد الشهري للإجازات (أيام)<input type="number" min="0" max="31" step="0.5" value={policy.monthlyLeaveDays} onChange={event=>setPolicy(current=>({...current,monthlyLeaveDays:event.target.value}))}/></label>
      <label>حد الإجازة المرضية السنوي (أيام)<input type="number" min="0" max="366" step="0.5" value={policy.sickLeaveDays} onChange={event=>setPolicy(current=>({...current,sickLeaveDays:event.target.value}))}/></label>
     </div>
-    <button className="button button-primary" disabled={savingPolicy}>{savingPolicy?<Loader2 className="spin" size={18}/>:<Save size={18}/>} حفظ سياسات الشركة</button>
+    <button className="button button-primary" disabled={savingPolicy}>{savingPolicy?<Skeleton size={18} />:<Save size={18}/>} حفظ سياسات الشركة</button>
    </form>
   </section>
 
@@ -107,13 +115,13 @@ export default function SettingsPage(){
      <label className="checkbox-label"><input type="checkbox" checked={form.isPaid} onChange={event=>setForm(current=>({...current,isPaid:event.target.checked}))}/> إجازة مدفوعة</label>
     </div>
     <label className="checkbox-label"><input type="checkbox" checked={form.isActive} onChange={event=>setForm(current=>({...current,isActive:event.target.checked}))}/> متاح للموظفين</label>
-    <div className="row-actions"><button className="button button-primary" disabled={saving}>{saving?<Loader2 className="spin" size={18}/>:<Save size={18}/>} حفظ النوع</button>
+    <div className="row-actions"><button className="button button-primary" disabled={saving}>{saving?<Skeleton size={18} />:<Save size={18}/>} حفظ النوع</button>
      {form.id&&<button type="button" className="button button-ghost" onClick={()=>setForm(emptyForm)}><X size={18}/> إلغاء التعديل</button>}</div>
    </form>
   </section>
 
   <section className="panel data-table-panel"><div className="page-heading"><div><h2>أنواع الإجازات</h2><p>تُجمع الطلبات ضمن فئة الحد المحددة أعلاه. التعطيل يحفظ الطلبات السابقة.</p></div><button className="button button-ghost" onClick={()=>{setForm(emptyForm);setError('');setSuccess('')}}><Plus size={18}/> نوع جديد</button></div>
-   {loading?<div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الإعدادات...</strong></div>:rows.length===0?<div className="empty-state"><strong>لا توجد أنواع إجازات.</strong></div>:
+   {loading?<div className="empty-state"><Skeleton /><strong>جارٍ تحميل الإعدادات...</strong></div>:rows.length===0?<div className="empty-state"><strong>لا توجد أنواع إجازات.</strong></div>:
     <div className="responsive-table"><table className="data-table"><thead><tr><th>الاسم</th><th>الرمز</th><th>الدفع</th><th>فئة الحد</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><td>{row.name}</td><td>{row.code}</td><td>{row.is_paid?'مدفوعة':'غير مدفوعة'}</td><td>{categoryLabels[row.quota_category]}</td><td>{row.is_active?'مفعلة':'معطلة'}</td><td><button className="button button-ghost" onClick={()=>edit(row)}>تعديل</button></td></tr>)}</tbody></table></div>}
   </section>
  </main>

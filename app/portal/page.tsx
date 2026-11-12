@@ -1,14 +1,32 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
-  AlertTriangle, Bell, CalendarDays, CheckCircle2, Clock3, FileText,
-  Loader2, LogIn, LogOut, MapPin, Send, ShieldAlert, Smartphone, UserRound,
-  WalletCards, XCircle,
+  FormEvent,
+  useEffect,
+  useRef,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import {
+  AlertTriangle,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  LogIn,
+  LogOut,
+  MapPin,
+  Send,
+  ShieldAlert,
+  Smartphone,
+  UserRound,
+  WalletCards,
+  XCircle,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import { getDeviceActivationErrorNotice } from '@/lib/device-activation-feedback'
 import {
   ensureIosWebKey,
   getExistingIosWebKey,
@@ -150,6 +168,7 @@ export default function PortalPage(){
   const [webExceptionAllowed,setWebExceptionAllowed]=useState(false)
   const [iosStatus,setIosStatus]=useState<IosWebStatus|null>(null)
   const [mobileDevice,setMobileDevice]=useState<MobileDeviceState|null>(null)
+  const [deviceActivationNotice,setDeviceActivationNotice]=useState('')
   const [leavePolicyBalance,setLeavePolicyBalance]=useState<LeavePolicyBalance|null>(null)
   const [leaveOpen,setLeaveOpen]=useState(false)
   const [leaveForm,setLeaveForm]=useState({
@@ -175,7 +194,7 @@ export default function PortalPage(){
   const lastSent=useRef(0)
   const secureWebMode=iosMode||webExceptionAllowed
   const attendanceReady=iosMode?Boolean(iosStatus?.bound):webExceptionAllowed
-  const attendancePending=iosMode?Boolean(iosStatus?.pending):false
+  const attendancePending=Boolean(iosStatus?.pending||mobileDevice?.status==='released')
 
 
   async function invokeIosWeb(body: Record<string, unknown>) {
@@ -341,6 +360,9 @@ export default function PortalPage(){
     const supabase=createClient()
     const {data,error:statusError}=await supabase.rpc('app_my_mobile_device_status')
     if(!statusError)setMobileDevice(data as MobileDeviceState)
+    else if(['PGRST202','PGRST203','42883'].includes(statusError.code??'')){
+      setDeviceActivationNotice(getDeviceActivationErrorNotice(statusError))
+    }
   }
   async function loadLeavePolicyBalance(){
     const supabase=createClient()
@@ -348,7 +370,7 @@ export default function PortalPage(){
     if(!balanceError)setLeavePolicyBalance(data as LeavePolicyBalance)
   }
   async function requestMobileDeviceActivation(){
-    setWorking(true);setError('');setSuccess('')
+    setWorking(true);setError('');setSuccess('');setDeviceActivationNotice('')
     try{
       let fingerprint:string
       if(isIosBrowser()){
@@ -375,18 +397,28 @@ export default function PortalPage(){
       const {data,error:requestError}=await supabase.rpc('app_request_my_mobile_device',{
         p_device_id:fingerprint,
       })
-      if(requestError)throw requestError
+      if(requestError){
+        if(['PGRST202','PGRST203','42883'].includes(requestError.code??'')
+          ||/app_request_my_mobile_device.*(schema cache|does not exist|not found)/i.test(requestError.message)){
+          setDeviceActivationNotice(getDeviceActivationErrorNotice(requestError))
+          return
+        }
+        throw requestError
+      }
       const next=data as {status?:MobileDeviceState['status']}
       setMobileDevice({has_device:true,status:next.status??'released',device_id_short:fingerprint.slice(-8)})
       await loadMobileDevice()
       if(!isIosBrowser())await refreshIosStatus()
-      setSuccess(next.status==='active'
-        ?'هذا الجهاز مفعّل بالفعل.'
-        :next.status==='revoked'
-          ?'هذا الجهاز ملغي التفعيل. تواصل مع مسؤول الشركة لإعادة إتاحته.'
-          :'تم إرسال طلب تفعيل الجهاز إلى مسؤول الشركة.')
+      if(next.status==='revoked'){
+        setDeviceActivationNotice('هذا الجهاز ملغي التفعيل. تواصل مع مسؤول الشركة لإعادة إتاحته قبل تسجيل الحضور.')
+      }else{
+        setSuccess(next.status==='active'
+          ?'هذا الجهاز مفعّل بالفعل.'
+          :'تم إرسال طلب تفعيل الجهاز بنجاح للمدير. ستتمكن من تسجيل الحضور بعد الموافقة.')
+      }
     }catch(caught){
-      setError(caught instanceof Error?caught.message:'تعذر إرسال طلب تفعيل الجهاز.')
+      const activationError=caught as {code?:string;message?:string}
+      setDeviceActivationNotice(getDeviceActivationErrorNotice(activationError))
     }finally{setWorking(false)}
   }
   async function loadHourPermissions(){
@@ -507,6 +539,11 @@ export default function PortalPage(){
     })
   }
   async function attendanceAction(action:'check_in'|'check_out'){
+    if(!attendanceReady){
+      await requestMobileDeviceActivation()
+      return
+    }
+
     if(!secureWebMode){
       if(!iosMode){await requestMobileDeviceActivation();return}
       setError(
@@ -554,7 +591,12 @@ export default function PortalPage(){
       setSuccess(result?.message??'تم تنفيذ العملية بنجاح.')
       await load()
     }catch(caught){
-      setError(caught instanceof Error?caught.message:'تعذر تنفيذ عملية الحضور.')
+      const attendanceError=caught as {code?:string;message?:string}
+      if(/attendance device is not active|device is not active/i.test(attendanceError.message??'')){
+        setDeviceActivationNotice(getDeviceActivationErrorNotice(attendanceError))
+      }else{
+        setError(caught instanceof Error?caught.message:'تعذر تنفيذ عملية الحضور.')
+      }
     }finally{setWorking(false)}
   }
 
@@ -716,22 +758,18 @@ export default function PortalPage(){
               {monitorInfo}</small>}
           </div>
         </div>
-        {iosMode&&!iosStatus?.bound?
-          <button className="button button-attendance"
-            disabled={working||attendancePending}
-            onClick={()=>void requestIosActivation()}>
-            {working?<Loader2 className="spin" size={20}/>:<Smartphone size={20}/>}
-            {attendancePending?'بانتظار الموافقة':'طلب تفعيل جهاز الحضور'}
-          </button>:
-          <button className={`button button-attendance ${data.open_session?'checkout':''}`}
-            disabled={working||!attendanceReady||todayShift?.day_type!=='work'}
-            onClick={()=>void attendanceAction(data.open_session?'check_out':'check_in')}>
-            {working?<Loader2 className="spin" size={20}/>:
-              data.open_session?<LogOut size={20}/>:<LogIn size={20}/>}
-            {attendanceReady?
-              data.open_session?'تسجيل الانصراف':'تسجيل الحضور':
-              'استخدم تطبيق emora Team'}
-          </button>}
+        <button className={`button button-attendance ${data.open_session?'checkout':''}`}
+          disabled={working||attendancePending||todayShift?.day_type!=='work'}
+          onClick={()=>void attendanceAction(data.open_session?'check_out':'check_in')}>
+          {working?<Skeleton size={20} />:
+            attendanceReady?
+              data.open_session?<LogOut size={20}/>:<LogIn size={20}/>:
+              <Smartphone size={20}/>}
+          {attendancePending?'بانتظار موافقة مسؤول الشركة':attendanceReady?
+            data.open_session?'تسجيل الانصراف':'تسجيل الحضور':
+            'طلب تفعيل الجهاز وتسجيل الحضور'}
+        </button>
+        {deviceActivationNotice&&<div className="form-note device-activation-notice" role="status" aria-live="polite"><AlertTriangle size={18}/><span>{deviceActivationNotice}</span></div>}
       </section>
 
       <section className="employee-device-box portal-device-activation">
@@ -746,7 +784,7 @@ export default function PortalPage(){
         {mobileDevice?.device_id_short&&<small>معرّف الجهاز: {mobileDevice.device_id_short}</small>}
         {mobileDevice?.status!=='active'&&<button type="button" className="button button-ghost button-full"
           disabled={working||mobileDevice?.status==='revoked'} onClick={()=>void requestMobileDeviceActivation()}>
-          {working?<Loader2 className="spin" size={18}/>:<Smartphone size={18}/>}
+          {working?<Skeleton size={18} />:<Smartphone size={18}/>}
           {mobileDevice?.status==='released'?'تحديث طلب تفعيل الجهاز':'طلب تفعيل هذا الجهاز'}
         </button>}
         <small>بعد التفعيل يبقى تحقق GPS ودقة الموقع ونطاق الفرع إلزاميًا لكل حضور.</small>
@@ -961,7 +999,7 @@ export default function PortalPage(){
         <label>السبب<textarea rows={4} value={leaveForm.reason}
           onChange={e=>setLeaveForm(c=>({...c,reason:e.target.value}))}/></label>
         <button className="button button-primary button-full" disabled={working}>
-          {working?<Loader2 className="spin" size={18}/>:<Send size={18}/>}
+          {working?<Skeleton size={18} />:<Send size={18}/>}
           إرسال الطلب
         </button>
       </form>
@@ -1032,7 +1070,7 @@ export default function PortalPage(){
           className="button button-primary button-full"
           disabled={permissionWorking}
         >
-          {permissionWorking?<Loader2 className="spin" size={18}/>:<Send size={18}/>}
+          {permissionWorking?<Skeleton size={18} />:<Send size={18}/>}
           إرسال طلب الإذن
         </button>
       </form>

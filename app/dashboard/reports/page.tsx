@@ -1,7 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Download, FileSpreadsheet, Loader2, RefreshCw } from 'lucide-react'
+import {
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { Download,
+  FileSpreadsheet,
+  RefreshCw,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Branch={id:string;name:string;code:string}
@@ -207,7 +213,7 @@ export default function ReportsPage(){
       </section>
 
       <section className="panel data-table-panel">
-        {loading?<div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل التقرير...</strong></div>
+        {loading?<div className="empty-state"><Skeleton /><strong>جارٍ تحميل التقرير...</strong></div>
         :rows.length===0?<div className="empty-state"><Download/><strong>لا توجد بيانات في الفترة المختارة</strong></div>
         :<div className="responsive-table"><table className="data-table report-table">
           <thead><tr><th>التاريخ</th><th>الموظف</th><th>الفرع</th><th>اليوم</th><th>المخطط</th><th>الحضور</th><th>الانصراف</th><th>الحالة</th><th>التأخير</th><th>ساعات العمل</th></tr></thead>
@@ -234,7 +240,7 @@ export default function ReportsPage(){
       </section>
 
       <section className="panel data-table-panel">
-        {loading?<div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل تقرير الفروع...</strong></div>
+        {loading?<div className="empty-state"><Skeleton /><strong>جارٍ تحميل تقرير الفروع...</strong></div>
         :branchRows.length===0?<div className="empty-state"><Download/><strong>لا توجد بيانات فروع في الفترة المختارة</strong></div>
         :<div className="responsive-table"><table className="data-table report-table">
           <thead><tr>

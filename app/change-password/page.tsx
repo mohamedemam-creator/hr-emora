@@ -1,8 +1,13 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import {
+  FormEvent,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, KeyRound, Loader2 } from 'lucide-react'
+import { CheckCircle2,
+  KeyRound,
+} from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
 import { hasAdminAccess, type AppAccess } from '@/lib/app-access'
@@ -58,7 +63,7 @@ export default function ChangePasswordPage() {
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
           <button className="button button-primary button-full" disabled={loading}>
-            {loading ? <Loader2 className="spin" size={18}/> : <KeyRound size={18}/>}
+            {loading ? <Skeleton size={18} /> : <KeyRound size={18}/>}
             {loading ? 'جارٍ الحفظ...' : 'حفظ كلمة المرور'}
           </button>
         </form>

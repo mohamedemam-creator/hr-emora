@@ -16,7 +16,7 @@ revoke all on table public.company_leave_policies from public,anon,authenticated
 alter table public.leave_types add column if not exists quota_category text not null default 'custom'
  check(quota_category in ('annual','monthly','sick','custom'));
 
-create function public.app_company_leave_policy() returns jsonb
+create or replace function public.app_company_leave_policy() returns jsonb
 language plpgsql stable security definer set search_path=''
 as $$
 declare c uuid:=app_private.require_company_permission('leaves.manage_types'); p public.company_leave_policies;
@@ -29,7 +29,7 @@ end; $$;
 revoke all on function public.app_company_leave_policy() from public,anon;
 grant execute on function public.app_company_leave_policy() to authenticated;
 
-create function public.app_save_company_leave_policy(
+create or replace function public.app_save_company_leave_policy(
  p_annual_leave_days numeric,p_monthly_leave_days numeric,p_sick_leave_days numeric
 ) returns void language plpgsql security definer set search_path=''
 as $$
@@ -52,7 +52,7 @@ end; $$;
 revoke all on function public.app_save_company_leave_policy(numeric,numeric,numeric) from public,anon;
 grant execute on function public.app_save_company_leave_policy(numeric,numeric,numeric) to authenticated;
 
-create function public.app_my_leave_policy_balance() returns jsonb
+create or replace function public.app_my_leave_policy_balance() returns jsonb
 language plpgsql stable security definer set search_path=''
 as $$
 declare
@@ -100,7 +100,7 @@ end; $$;
 revoke all on function public.app_my_leave_policy_balance() from public,anon;
 grant execute on function public.app_my_leave_policy_balance() to authenticated;
 
-create function public.app_list_leave_types_with_category()
+create or replace function public.app_list_leave_types_with_category()
 returns table(id uuid,name text,code text,is_paid boolean,requires_attachment boolean,quota_category text,is_active boolean)
 language plpgsql stable security definer set search_path=''
 as $$
@@ -112,7 +112,7 @@ end; $$;
 revoke all on function public.app_list_leave_types_with_category() from public,anon;
 grant execute on function public.app_list_leave_types_with_category() to authenticated;
 
-create function public.app_save_leave_type_with_category(
+create or replace function public.app_save_leave_type_with_category(
  p_id uuid,p_name text,p_code text,p_is_paid boolean,p_quota_category text,p_is_active boolean
 ) returns uuid language plpgsql security definer set search_path=''
 as $$
@@ -144,7 +144,7 @@ end; $$;
 revoke all on function public.app_save_leave_type_with_category(uuid,text,text,boolean,text,boolean) from public,anon;
 grant execute on function public.app_save_leave_type_with_category(uuid,text,text,boolean,text,boolean) to authenticated;
 
-create function app_private.enforce_company_leave_policy()
+create or replace function app_private.enforce_company_leave_policy()
 returns trigger language plpgsql security definer set search_path=''
 as $$
 declare

@@ -1,12 +1,18 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import {
   CheckCircle2,
   Download,
   Edit3,
   FileSpreadsheet,
-  Loader2,
   Plus,
   RefreshCw,
   Trash2,
@@ -477,7 +483,7 @@ export default function EmployeesPage() {
 
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
-          <button className="button button-primary button-full" disabled={saving}>{saving ? <Loader2 className="spin" size={18}/> : <UsersRound size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ الموظف'}</button>
+          <button className="button button-primary button-full" disabled={saving}>{saving ? <Skeleton size={18} /> : <UsersRound size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ الموظف'}</button>
         </form>
       </main>
     )
@@ -485,13 +491,13 @@ export default function EmployeesPage() {
 
   return (
     <main className="dashboard-content">
-      <section className="page-heading management-heading"><div><span className="eyebrow">بيانات فعلية</span><h1>الموظفون</h1><p>{employees.length} موظف ظاهرون حسب نطاق صلاحياتك.</p></div><div className="page-actions"><button className="button button-primary" disabled={codeLoading} onClick={() => void openCreate()}>{codeLoading ? <Loader2 className="spin" size={18}/> : <Plus size={18}/>} {codeLoading ? 'جارٍ تجهيز الكود...' : 'إضافة موظف'}</button><button className="button button-ghost" onClick={() => void downloadTemplate()}><Download size={18}/> نموذج Excel</button><button className="button button-ghost" onClick={() => fileInputRef.current?.click()}><Upload size={18}/> استيراد Excel</button><button className="button button-ghost" onClick={() => void exportExcel()}><FileSpreadsheet size={18}/> تصدير Excel</button><input ref={fileInputRef} hidden type="file" accept=".xlsx,.xls" onChange={importExcel}/></div></section>
+      <section className="page-heading management-heading"><div><span className="eyebrow">بيانات فعلية</span><h1>الموظفون</h1><p>{employees.length} موظف ظاهرون حسب نطاق صلاحياتك.</p></div><div className="page-actions"><button className="button button-primary" disabled={codeLoading} onClick={() => void openCreate()}>{codeLoading ? <Skeleton size={18} /> : <Plus size={18}/>} {codeLoading ? 'جارٍ تجهيز الكود...' : 'إضافة موظف'}</button><button className="button button-ghost" onClick={() => void downloadTemplate()}><Download size={18}/> نموذج Excel</button><button className="button button-ghost" onClick={() => fileInputRef.current?.click()}><Upload size={18}/> استيراد Excel</button><button className="button button-ghost" onClick={() => void exportExcel()}><FileSpreadsheet size={18}/> تصدير Excel</button><input ref={fileInputRef} hidden type="file" accept=".xlsx,.xls" onChange={importExcel}/></div></section>
       {error && <div className="form-error management-message">{error}</div>}
       {success && <div className="form-success management-message"><CheckCircle2 size={18}/>{success}</div>}
       {importMessage && <div className="form-success management-message"><CheckCircle2 size={18}/>{importMessage}</div>}
       <section className="panel management-toolbar"><div className="table-search"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ابحث بالاسم أو الكود أو الفرع أو الوظيفة..." /></div><select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)}><option value="all">كل الحالات</option><option value="active">نشط</option><option value="suspended">موقوف</option><option value="on_leave">في إجازة</option><option value="terminated">منتهي الخدمة</option></select><button className="button button-ghost" onClick={() => void loadData()}><RefreshCw size={18}/> تحديث</button></section>
       <section className="panel data-table-panel">
-        {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الموظفين...</strong></div> : filtered.length === 0 ? <div className="empty-state"><UsersRound/><strong>لا يوجد موظفون</strong><button className="button button-primary" disabled={codeLoading} onClick={() => void openCreate()}>{codeLoading ? <Loader2 className="spin" size={18}/> : <Plus size={18}/>} إضافة موظف</button></div> : <div className="responsive-table"><table className="data-table employee-table"><thead><tr><th>الموظف</th><th>الفرع</th><th>الوظيفة</th><th>الدور</th><th>المدير</th><th>الراتب</th><th>العنوان</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filtered.map(employee => <tr key={employee.id}><td><div className="primary-cell"><strong>{employee.full_name}</strong><span>{employee.employee_code} • {employee.phone ?? 'بدون هاتف'}</span></div></td><td>{employee.branch_name ?? 'بدون فرع'}</td><td><div className="primary-cell"><strong>{employee.job_title_name ?? 'غير محدد'}</strong><span>{employee.department_name ?? 'بدون قسم'}</span></div></td><td>{employee.role_names || 'بدون دور'}</td><td>{employee.direct_manager_name ?? 'غير محدد'}</td><td><div className="primary-cell"><strong>{Number(employee.base_salary).toLocaleString('ar-EG')}</strong><span>{salaryLabels[employee.salary_type]} • أوفر تايم {Number(employee.overtime_hour_rate).toLocaleString('ar-EG')}</span></div></td><td className="wide-cell">{employee.address ?? 'لم يسجل عنوان'}</td><td><span className={`status-badge ${employee.employment_status}`}>{statusLabels[employee.employment_status]}</span></td><td><div className="row-actions"><button title="حساب الدخول" onClick={() => setAccountEmployee(employee)}><KeyRound size={17}/></button><button onClick={() => openEdit(employee)}><Edit3 size={17}/></button><button title={employee.employment_status === 'active' ? 'إيقاف' : 'تفعيل'} disabled={workingId === employee.id} onClick={() => void changeStatus(employee)}>{workingId === employee.id ? <Loader2 className="spin" size={16}/> : <UserRoundX size={17}/>}</button>{canDeleteEmployee && <button className="danger" disabled={workingId === employee.id} title="حذف آمن — متاح لمدير المنطقة أو مدير النظام فقط" onClick={() => void deleteEmployee(employee)}><Trash2 size={17}/></button>}</div></td></tr>)}</tbody></table></div>}
+        {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل الموظفين...</strong></div> : filtered.length === 0 ? <div className="empty-state"><UsersRound/><strong>لا يوجد موظفون</strong><button className="button button-primary" disabled={codeLoading} onClick={() => void openCreate()}>{codeLoading ? <Skeleton size={18} /> : <Plus size={18}/>} إضافة موظف</button></div> : <div className="responsive-table"><table className="data-table employee-table"><thead><tr><th>الموظف</th><th>الفرع</th><th>الوظيفة</th><th>الدور</th><th>المدير</th><th>الراتب</th><th>العنوان</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filtered.map(employee => <tr key={employee.id}><td><div className="primary-cell"><strong>{employee.full_name}</strong><span>{employee.employee_code} • {employee.phone ?? 'بدون هاتف'}</span></div></td><td>{employee.branch_name ?? 'بدون فرع'}</td><td><div className="primary-cell"><strong>{employee.job_title_name ?? 'غير محدد'}</strong><span>{employee.department_name ?? 'بدون قسم'}</span></div></td><td>{employee.role_names || 'بدون دور'}</td><td>{employee.direct_manager_name ?? 'غير محدد'}</td><td><div className="primary-cell"><strong>{Number(employee.base_salary).toLocaleString('ar-EG')}</strong><span>{salaryLabels[employee.salary_type]} • أوفر تايم {Number(employee.overtime_hour_rate).toLocaleString('ar-EG')}</span></div></td><td className="wide-cell">{employee.address ?? 'لم يسجل عنوان'}</td><td><span className={`status-badge ${employee.employment_status}`}>{statusLabels[employee.employment_status]}</span></td><td><div className="row-actions"><button title="حساب الدخول" onClick={() => setAccountEmployee(employee)}><KeyRound size={17}/></button><button onClick={() => openEdit(employee)}><Edit3 size={17}/></button><button title={employee.employment_status === 'active' ? 'إيقاف' : 'تفعيل'} disabled={workingId === employee.id} onClick={() => void changeStatus(employee)}>{workingId === employee.id ? <Skeleton size={16} /> : <UserRoundX size={17}/>}</button>{canDeleteEmployee && <button className="danger" disabled={workingId === employee.id} title="حذف آمن — متاح لمدير المنطقة أو مدير النظام فقط" onClick={() => void deleteEmployee(employee)}><Trash2 size={17}/></button>}</div></td></tr>)}</tbody></table></div>}
       </section>
     {accountEmployee && <EmployeeAccountPanel employee={accountEmployee} onClose={() => setAccountEmployee(null)} onUpdated={async () => { await loadData(); setAccountEmployee(current => current ? employees.find(item => item.id === current.id) ?? current : null) }}/>}
     </main>

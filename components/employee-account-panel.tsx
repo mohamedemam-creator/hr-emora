@@ -1,7 +1,16 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
-import { CheckCircle2, KeyRound, Loader2, Power, Smartphone, X } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { CheckCircle2,
+  KeyRound,
+  Power,
+  Smartphone,
+  X,
+} from 'lucide-react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { activateEmployeeMobileDevice, resetEmployeePassword } from '@/app/dashboard/employees/actions'
@@ -287,7 +296,7 @@ export function EmployeeAccountPanel({
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
           <button className="button button-primary button-full" disabled={loading || (!employee.has_login && Boolean(employee.account_invited_at))}>
-            {loading ? <Loader2 className="spin" size={18}/> : <KeyRound size={18}/>}
+            {loading ? <Skeleton size={18} /> : <KeyRound size={18}/>}
             {employee.has_login ? 'تعيين كلمة مرور جديدة' : 'إرسال دعوة التفعيل'}
           </button>
         </form>
@@ -314,7 +323,7 @@ export function EmployeeAccountPanel({
             <Smartphone size={18}/> السماح بإعادة استخدام الهاتف المحظور
           </button>}
           {device?.status==='released' && device.can_activate && <button type="button" className="button button-primary button-full" disabled={loading} onClick={()=>void activateDevice()}>
-            {loading?<Loader2 className="spin" size={18}/>:<CheckCircle2 size={18}/>} تفعيل الجهاز
+            {loading?<Skeleton size={18} />:<CheckCircle2 size={18}/>} تفعيل الجهاز
           </button>}
         </div>
 

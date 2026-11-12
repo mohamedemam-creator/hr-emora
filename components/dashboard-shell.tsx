@@ -8,6 +8,17 @@ import { Topbar } from '@/components/topbar'
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    setSidebarCollapsed(window.localStorage.getItem('emora.sidebar-collapsed') === 'true')
+  }, [])
+
+  function toggleSidebar() {
+    const nextCollapsed = !sidebarCollapsed
+    setSidebarCollapsed(nextCollapsed)
+    window.localStorage.setItem('emora.sidebar-collapsed', String(nextCollapsed))
+  }
 
   useEffect(() => {
     setMobileMenuOpen(false)
@@ -21,9 +32,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }, [mobileMenuOpen])
 
   return (
-    <div className="dashboard-shell">
+    <div className={`dashboard-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
         mobileOpen={mobileMenuOpen}
+        collapsed={sidebarCollapsed}
         onNavigate={() => setMobileMenuOpen(false)}
       />
 
@@ -37,7 +49,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="dashboard-main">
-        <Topbar onMenuToggle={() => setMobileMenuOpen(value => !value)} />
+        <Topbar
+          onMenuToggle={() => setMobileMenuOpen(value => !value)}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
         {children}
       </div>
     </div>

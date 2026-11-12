@@ -5,9 +5,9 @@ type LogoProps = { compact?: boolean; light?: boolean }
 function Mark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" {...props}>
-      <rect width="48" height="48" rx="15" fill="#17334A" />
-      <path d="M14 14h21v5H19v5h13v5H19v5h16v5H14V14Z" fill="#F7FBFA" />
-      <path d="M30 14h5v5h-5zM30 24h5v5h-5zM30 34h5v5h-5z" fill="#53D1B3" />
+      <rect width="48" height="48" rx="15" fill="#29245F" />
+      <path d="M14 14h21v5H19v5h13v5H19v5h16v5H14V14Z" fill="#F7F8FF" />
+      <path d="M30 14h5v5h-5zM30 24h5v5h-5zM30 34h5v5h-5z" fill="#22D3EE" />
     </svg>
   )
 }

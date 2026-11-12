@@ -1,8 +1,15 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import {
+  FormEvent,
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import { useRouter } from 'next/navigation'
-import { Building2, CheckCircle2, Loader2, LockKeyhole } from 'lucide-react'
+import { Building2,
+  CheckCircle2,
+  LockKeyhole,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { hasAdminAccess, type AppAccess } from '@/lib/app-access'
 import { Logo } from '@/components/logo'
@@ -94,7 +101,7 @@ export default function AcceptInvitationPage() {
         <h1>تأكيد حساب الموظف</h1>
         <p>تأكد من اسم الشركة قبل ربط حسابك بعضوية الموظف.</p>
       </div>
-      {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الدعوات...</strong></div> :
+      {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل الدعوات...</strong></div> :
         <form className="form-stack" onSubmit={accept}>
           {invitations.map(invitation => <label className="invitation-choice" key={invitation.employee_id}>
             <input type="radio" name="invitation" value={invitation.employee_id} checked={selectedId===invitation.employee_id} onChange={() => setSelectedId(invitation.employee_id)} />
@@ -103,7 +110,7 @@ export default function AcceptInvitationPage() {
           {needsPassword && <label>كلمة مرور جديدة<div className="input-wrap"><LockKeyhole size={18}/><input type="password" minLength={8} required value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password"/></div></label>}
           {error && <div className="form-error">{error}</div>}
           {invitations.length > 0 && <button className="button button-primary button-full" disabled={working || !selectedId}>
-            {working ? <Loader2 className="spin" size={18}/> : <CheckCircle2 size={18}/>} قبول الدعوة والدخول
+            {working ? <Skeleton size={18} /> : <CheckCircle2 size={18}/>} قبول الدعوة والدخول
           </button>}
         </form>}
     </section>

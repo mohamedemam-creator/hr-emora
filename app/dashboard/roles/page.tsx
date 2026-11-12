@@ -1,7 +1,19 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Edit3, Loader2, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react'
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { CheckCircle2,
+  Edit3,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Role = {
@@ -133,7 +145,7 @@ export default function RolesPage() {
 
           {error && <div className="form-error">{error}</div>}
           {success && <div className="form-success"><CheckCircle2 size={18}/>{success}</div>}
-          <button className="button button-primary button-full" disabled={saving}>{saving ? <Loader2 className="spin" size={18}/> : <ShieldCheck size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ الدور والصلاحيات'}</button>
+          <button className="button button-primary button-full" disabled={saving}>{saving ? <Skeleton size={18} /> : <ShieldCheck size={18}/>} {saving ? 'جارٍ الحفظ...' : 'حفظ الدور والصلاحيات'}</button>
         </form>
       </main>
     )
@@ -145,7 +157,7 @@ export default function RolesPage() {
       {error && <div className="form-error management-message">{error}</div>}
       <section className="panel management-toolbar"><div className="table-search"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ابحث باسم الدور أو الكود..." /></div><button className="button button-ghost" onClick={() => void loadData()}><RefreshCw size={18}/> تحديث</button></section>
       <section className="panel data-table-panel">
-        {loading ? <div className="empty-state"><Loader2 className="spin"/><strong>جارٍ تحميل الأدوار...</strong></div> : filtered.length === 0 ? <div className="empty-state"><ShieldCheck/><strong>لا توجد أدوار</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة دور</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>الدور</th><th>النوع</th><th>عدد الصلاحيات</th><th>الموظفون</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filtered.map(role => <tr key={role.id}><td><div className="primary-cell"><strong>{role.name}</strong><span>{role.code}</span></div></td><td>{role.is_system ? 'نظامي' : 'مخصص'}</td><td>{role.permission_codes?.length ?? 0}</td><td>{role.employee_count}</td><td><span className={`status-badge ${role.is_active ? 'active' : 'inactive'}`}>{role.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openEdit(role)}><Edit3 size={17}/></button><button className="danger" disabled={role.is_system || workingId === role.id} title={role.is_system ? 'لا يمكن حذف دور نظامي' : 'حذف'} onClick={() => void deleteRole(role)}>{workingId === role.id ? <Loader2 className="spin" size={16}/> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>}
+        {loading ? <div className="empty-state"><Skeleton /><strong>جارٍ تحميل الأدوار...</strong></div> : filtered.length === 0 ? <div className="empty-state"><ShieldCheck/><strong>لا توجد أدوار</strong><button className="button button-primary" onClick={openCreate}><Plus size={18}/> إضافة دور</button></div> : <div className="responsive-table"><table className="data-table"><thead><tr><th>الدور</th><th>النوع</th><th>عدد الصلاحيات</th><th>الموظفون</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filtered.map(role => <tr key={role.id}><td><div className="primary-cell"><strong>{role.name}</strong><span>{role.code}</span></div></td><td>{role.is_system ? 'نظامي' : 'مخصص'}</td><td>{role.permission_codes?.length ?? 0}</td><td>{role.employee_count}</td><td><span className={`status-badge ${role.is_active ? 'active' : 'inactive'}`}>{role.is_active ? 'نشط' : 'غير نشط'}</span></td><td><div className="row-actions"><button onClick={() => openEdit(role)}><Edit3 size={17}/></button><button className="danger" disabled={role.is_system || workingId === role.id} title={role.is_system ? 'لا يمكن حذف دور نظامي' : 'حذف'} onClick={() => void deleteRole(role)}>{workingId === role.id ? <Skeleton size={16} /> : <Trash2 size={17}/>}</button></div></td></tr>)}</tbody></table></div>}
       </section>
     </main>
   )

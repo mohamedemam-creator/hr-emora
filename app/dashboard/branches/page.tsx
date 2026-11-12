@@ -1,6 +1,13 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
 import {
   Building2,
   CheckCircle2,
@@ -11,7 +18,6 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Link2,
-  Loader2,
   MapPin,
   Plus,
   RefreshCw,
@@ -816,7 +822,7 @@ export default function BranchesPage() {
                 <div className="address-search-row">
                   <input value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} placeholder="مثال: الهرم، الجيزة" />
                   <button type="button" className="button button-secondary" onClick={() => void searchAddress()} disabled={searching}>
-                    {searching ? <Loader2 className="spin" size={18} /> : <Search size={18} />} {searching ? 'جارٍ البحث...' : 'بحث'}
+                    {searching ? <Skeleton size={18} /> : <Search size={18} />} {searching ? 'جارٍ البحث...' : 'بحث'}
                   </button>
                 </div>
               </label>
@@ -875,7 +881,7 @@ export default function BranchesPage() {
               <div className="location-icon"><MapPin /></div>
               <div><strong>موقع الفرع</strong><p>اضغط على الخريطة أو اسحب العلامة إلى مدخل الفرع.</p></div>
               <button type="button" className="button button-secondary" onClick={getCurrentLocation} disabled={locating}>
-                {locating ? <Loader2 className="spin" size={18} /> : <Crosshair size={18} />} {locating ? 'جارٍ التحديد...' : 'استخدام موقعي الحالي'}
+                {locating ? <Skeleton size={18} /> : <Crosshair size={18} />} {locating ? 'جارٍ التحديد...' : 'استخدام موقعي الحالي'}
               </button>
             </div>
 
@@ -887,7 +893,7 @@ export default function BranchesPage() {
 
           <aside className="panel map-preview real-map-panel">
             <div className="real-map" ref={mapElementRef} />
-            {!mapReady && <div className="map-loading"><Loader2 className="spin" /> جارٍ تحميل الخريطة...</div>}
+            {!mapReady && <div className="map-loading"><Skeleton /> جارٍ تحميل الخريطة...</div>}
             <div className="map-info"><h3>اختيار الموقع على الخريطة</h3><p>{coordinates ? `الدائرة البنفسجية تمثل نطاقًا قدره ${form.radius} متر.` : 'ابحث عن عنوان، الصق موقع Google Maps، أو اضغط على الخريطة.'}</p><div className="map-tip"><strong>مهم</strong><span>ضع العلامة عند مدخل الفرع، وليس في منتصف الشارع. يمكنك الاستعانة بـ Google Maps للوصول للنقطة الدقيقة.</span></div></div>
           </aside>
         </form>
@@ -918,12 +924,12 @@ export default function BranchesPage() {
           <option value="active">الفروع النشطة</option>
           <option value="inactive">الفروع غير النشطة</option>
         </select>
-        <button type="button" className="button button-ghost" onClick={() => void loadBranches()} disabled={listLoading}><RefreshCw className={listLoading ? 'spin' : ''} size={18} /> تحديث</button>
+        <button type="button" className="button button-ghost" onClick={() => void loadBranches()} disabled={listLoading}>{listLoading?<Skeleton size={18}/>:<RefreshCw size={18}/>} تحديث</button>
       </section>
 
       <section className="panel data-table-panel">
         {listLoading ? (
-          <div className="empty-state"><Loader2 className="spin" size={30} /><strong>جارٍ تحميل الفروع...</strong></div>
+          <div className="empty-state"><Skeleton size={30} /><strong>جارٍ تحميل الفروع...</strong></div>
         ) : filteredBranches.length === 0 ? (
           <div className="empty-state"><Building2 size={42} /><strong>{branches.length ? 'لا توجد نتائج مطابقة' : 'لا توجد فروع مسجلة'}</strong><span>{branches.length ? 'غيّر البحث أو الفلتر.' : 'ابدأ بإضافة فرع أو استيراد ملف Excel.'}</span>{!branches.length && <button className="button button-primary" onClick={openCreate}><Plus size={18} /> إضافة أول فرع</button>}</div>
         ) : (
@@ -942,7 +948,7 @@ export default function BranchesPage() {
                     <td><span className={`status-badge ${branch.is_active ? 'active' : 'inactive'}`}>{branch.is_active ? 'نشط' : 'غير نشط'}</span></td>
                     <td><div className="row-actions">
                       <button title="تعديل" onClick={() => openEdit(branch)}><Edit3 size={17} /></button>
-                      <button title={branch.is_active ? 'تعطيل' : 'تفعيل'} disabled={workingId === branch.id} onClick={() => void toggleActive(branch)}>{workingId === branch.id ? <Loader2 className="spin" size={17} /> : <CircleOff size={17} />}</button>
+                      <button title={branch.is_active ? 'تعطيل' : 'تفعيل'} disabled={workingId === branch.id} onClick={() => void toggleActive(branch)}>{workingId === branch.id ? <Skeleton size={17} /> : <CircleOff size={17} />}</button>
                       <button className="danger" title="حذف" disabled={workingId === branch.id} onClick={() => void deleteBranch(branch)}><Trash2 size={17} /></button>
                     </div></td>
                   </tr>

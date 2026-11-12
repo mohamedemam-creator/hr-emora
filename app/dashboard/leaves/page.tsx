@@ -1,7 +1,16 @@
 'use client'
 
-import { useEffect,useMemo,useState } from 'react'
-import { Check,FileText,Loader2,RefreshCw,X,XCircle } from 'lucide-react'
+import {
+  useEffect,
+  useMemo,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { Check,
+  FileText,
+  RefreshCw,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Request={
@@ -103,11 +112,11 @@ export default function LeavesPage(){
         <option value="cancelled">ملغي</option>
       </select></label>
       <button className="button button-primary" onClick={()=>void load()} disabled={loading}>
-        <RefreshCw className={loading?'spin':''} size={18}/> تحديث</button>
+        {loading?<Skeleton size={18}/>:<RefreshCw size={18}/>} تحديث</button>
     </section>
 
     <section className="panel data-table-panel">
-      {loading?<div className="empty-state"><Loader2 className="spin"/>
+      {loading?<div className="empty-state"><Skeleton />
         <strong>جارٍ تحميل الطلبات...</strong></div>:
       rows.length===0?<div className="empty-state"><FileText/>
         <strong>لا توجد طلبات</strong></div>:
@@ -154,7 +163,7 @@ export default function LeavesPage(){
         <button className={`button button-full ${
           reviewing.decision==='approved'?'button-primary':'button-danger-soft'
         }`} disabled={loading} onClick={()=>void review()}>
-          {loading?<Loader2 className="spin" size={18}/>:
+          {loading?<Skeleton size={18} />:
             reviewing.decision==='approved'?<Check size={18}/>:<X size={18}/>}
           تأكيد القرار
         </button>

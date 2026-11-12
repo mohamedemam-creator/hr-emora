@@ -179,9 +179,11 @@ const navigationGroups = [
 
 export function Sidebar({
   mobileOpen = false,
+  collapsed = false,
   onNavigate,
 }: {
   mobileOpen?: boolean
+  collapsed?: boolean
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
@@ -210,10 +212,10 @@ export function Sidebar({
   )
 
   return (
-    <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-mobile-heading">
         <Link href="/dashboard" className="sidebar-logo-link" aria-label="Emora HR — الرئيسية">
-          <Logo light />
+          <Logo />
         </Link>
         <button
           type="button"
@@ -227,7 +229,7 @@ export function Sidebar({
 
       <div className="sidebar-desktop-logo">
         <Link href="/dashboard" className="sidebar-logo-link" aria-label="Emora HR — الرئيسية">
-          <Logo light />
+          <Logo />
         </Link>
       </div>
 

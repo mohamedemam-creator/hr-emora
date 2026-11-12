@@ -1,7 +1,13 @@
 'use client'
 
-import { useEffect,useState } from 'react'
-import { Bell,CheckCheck,Loader2,RefreshCw } from 'lucide-react'
+import {
+  useEffect,
+  useState } from 'react'
+import { Skeleton } from '@/components/skeleton'
+import { Bell,
+  CheckCheck,
+  RefreshCw,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Notification={
@@ -37,7 +43,7 @@ export default function NotificationsPage(){
     </section>
     {error&&<div className="form-error management-message">{error}</div>}
     <section className="panel notifications-list">
-      {loading?<div className="empty-state"><Loader2 className="spin"/>
+      {loading?<div className="empty-state"><Skeleton />
         <strong>جارٍ تحميل التنبيهات...</strong></div>:
       rows.length===0?<div className="empty-state"><Bell/>
         <strong>لا توجد تنبيهات</strong></div>:
